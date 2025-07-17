@@ -14,7 +14,7 @@ module.exports = async (req, res) => {
     return res.status(500).json({ error: 'API key is not configured on the server. Please contact the site administrator.' });
   }
 
-  const apiUrl = `https://app.tryspecter.com/companies/${id}`;
+  const apiUrl = `https://app.tryspecter.com/api/v1/companies/${id}`;
 
   try {
     const specterResponse = await fetch(apiUrl, {
