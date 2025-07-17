@@ -16,7 +16,10 @@ module.exports = async (req, res) => {
 
   try {
     // STEP 1: Get the list of person IDs for the company
-    const peopleListUrl = `https://app.tryspecter.com/api/v1/companies/${companyId}/people`;
+    // --- MODIFICATION HERE ---
+    // Added '?founders=true' to the end of the URL to filter for founders only.
+    const peopleListUrl = `https://app.tryspecter.com/api/v1/companies/${companyId}/people?founders=true`;
+    
     const peopleListResponse = await fetch(peopleListUrl, {
       headers: { 'X-API-Key': apiKey },
     });
@@ -30,17 +33,16 @@ module.exports = async (req, res) => {
     const peopleList = await peopleListResponse.json();
 
     if (!peopleList || peopleList.length === 0) {
-      return res.status(200).json([]); // No people found, return empty array
+      // This now means "No founders found"
+      return res.status(200).json([]); 
     }
 
-    // STEP 2: For each person, fetch their detailed profile in parallel
+    // STEP 2: For each person (now just founders), fetch their detailed profile in parallel
     const personDetailPromises = peopleList.map(person => {
       const personDetailUrl = `https://app.tryspecter.com/api/v1/people/${person.person_id}`;
       return fetch(personDetailUrl, {
         headers: { 'X-API-Key': apiKey },
       }).then(response => {
-        // If a single person fetch fails, we don't want to crash the whole request.
-        // We'll return null for that person and handle it on the frontend.
         if (!response.ok) return null;
         return response.json();
       });
