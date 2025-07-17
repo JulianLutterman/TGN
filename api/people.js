@@ -1,7 +1,6 @@
 // File: /api/people.js
 
 module.exports = async (req, res) => {
-  // Use 'companyId' to be consistent with the frontend request
   const { companyId } = req.query;
 
   if (!companyId) {
@@ -15,28 +14,48 @@ module.exports = async (req, res) => {
     return res.status(500).json({ error: 'API key is not configured on the server.' });
   }
 
-  // This is the new endpoint for fetching people associated with a company
-  const apiUrl = `https://app.tryspecter.com/api/v1/companies/${companyId}/people`;
-
   try {
-    const peopleResponse = await fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        'X-API-Key': apiKey,
-      },
+    // STEP 1: Get the list of person IDs for the company
+    const peopleListUrl = `https://app.tryspecter.com/api/v1/companies/${companyId}/people`;
+    const peopleListResponse = await fetch(peopleListUrl, {
+      headers: { 'X-API-Key': apiKey },
     });
 
-    const data = await peopleResponse.json();
-
-    if (!peopleResponse.ok) {
-      console.error("Specter People API returned an error:", data);
-      return res.status(peopleResponse.status).json(data);
+    if (!peopleListResponse.ok) {
+      const errorData = await peopleListResponse.json();
+      console.error("Specter People List API returned an error:", errorData);
+      return res.status(peopleListResponse.status).json(errorData);
     }
 
-    return res.status(200).json(data);
+    const peopleList = await peopleListResponse.json();
+
+    if (!peopleList || peopleList.length === 0) {
+      return res.status(200).json([]); // No people found, return empty array
+    }
+
+    // STEP 2: For each person, fetch their detailed profile in parallel
+    const personDetailPromises = peopleList.map(person => {
+      const personDetailUrl = `https://app.tryspecter.com/api/v1/people/${person.person_id}`;
+      return fetch(personDetailUrl, {
+        headers: { 'X-API-Key': apiKey },
+      }).then(response => {
+        // If a single person fetch fails, we don't want to crash the whole request.
+        // We'll return null for that person and handle it on the frontend.
+        if (!response.ok) return null;
+        return response.json();
+      });
+    });
+
+    // Wait for all the detailed profile fetches to complete
+    const detailedPeople = await Promise.all(personDetailPromises);
+
+    // Filter out any null results from failed individual fetches
+    const successfulPeopleDetails = detailedPeople.filter(p => p !== null);
+
+    return res.status(200).json(successfulPeopleDetails);
 
   } catch (error) {
-    console.error(`Server-side fetch for people failed: ${error.message}`);
+    console.error(`Server-side orchestration for people failed: ${error.message}`);
     return res.status(500).json({ error: `Server error: ${error.message}` });
   }
 };

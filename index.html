@@ -98,11 +98,11 @@
         }
 
         .result-item {
-            margin-bottom: 15px;
+            margin-bottom: 20px;
         }
 
             .result-item h3 {
-                margin: 0 0 5px 0;
+                margin: 0 0 10px 0;
                 color: #1a2b4d;
             }
 
@@ -119,10 +119,14 @@
             .data-list li {
                 background-color: #f9f9f9;
                 border: 1px solid #eee;
-                padding: 10px;
+                padding: 12px;
                 margin-bottom: 10px;
                 border-radius: 4px;
             }
+
+                .data-list li small {
+                    color: #555;
+                }
     </style>
 </head>
 <body>
@@ -195,13 +199,17 @@
                 displayResults(data);
             } catch (error) {
                 console.error('Fetch error:', error);
-                showStatus(`Error: ${error.message}.`, 'error');
+                showStatus(`Error: ${error.message}. Check the console for more details.`, 'error');
             }
         });
 
         function extractCompanyId(url) {
-            const match = url.match(/\/feed\/([a-f0-9]+)/);
-            return match ? match[1] : null;
+            try {
+                const match = url.match(/\/feed\/([a-f0-9]+)/);
+                return match ? match[1] : null;
+            } catch (e) {
+                return null;
+            }
         }
 
         function showStatus(message, type) {
@@ -216,35 +224,26 @@
 
             // --- FIX: Displaying Detailed Funding History ---
             const fundingInfoEl = document.getElementById('fundingInfo');
-
-            // **HOW TO DEBUG**: Open the browser console. This line will print the funding object.
-            // You can inspect it to find the correct path to the array of rounds.
-            console.log('Inspecting funding object:', data.funding);
-
-            // This path is a common pattern. If it's different (e.g., `data.funding.funding_rounds`),
-            // you can find the correct path from the console.log above and change it here.
-            const fundingRounds = data.funding?.rounds;
-
+            const fundingRounds = data.funding?.funding_rounds; // Access the detailed rounds
             if (fundingRounds && fundingRounds.length > 0) {
                 let fundingHtml = '<ul class="data-list">';
                 fundingRounds.forEach(round => {
-                    const date = round.announced_on || 'N/A';
-                    const amount = round.raised_amount_usd ? `$${round.raised_amount_usd.toLocaleString()}` : 'Undisclosed';
-                    const investors = round.investor_names?.join(', ') || 'N/A';
-                    const roundType = round.investment_type || 'Funding Round';
+                    const date = round.date || 'N/A';
+                    const amount = round.amount_raised_usd ? `$${round.amount_raised_usd.toLocaleString()}` : 'Amount N/A';
+                    const investors = round.investors?.join(', ') || 'Investors N/A';
+                    const roundType = round.investment_type ? ` (${round.investment_type})` : '';
 
                     fundingHtml += `
                         <li>
-                            <strong>${roundType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</strong> on ${date}<br>
-                            <strong>Amount Raised:</strong> ${amount}<br>
-                            <strong>Investors:</strong> ${investors}
+                            <strong>${date}${roundType}: ${amount}</strong><br>
+                            <small>Investors: ${investors}</small>
                         </li>
                     `;
                 });
                 fundingHtml += '</ul>';
                 fundingInfoEl.innerHTML = fundingHtml;
             } else {
-                fundingInfoEl.innerHTML = '<p>No detailed funding history available.</p>';
+                fundingInfoEl.innerHTML = '<p>No funding history available.</p>';
             }
 
             resultsDiv.style.display = 'block';
@@ -256,56 +255,37 @@
             peopleInfoEl.innerHTML = '<p>Loading people...</p>';
 
             try {
-                // 1. Get the list of people (with their IDs)
-                const peopleListResponse = await fetch(`/api/people?companyId=${companyId}`);
-                const peopleList = await peopleListResponse.json();
+                // This single call now returns fully detailed people profiles
+                const response = await fetch(`/api/people?companyId=${companyId}`);
+                const peopleData = await response.json();
 
-                if (!peopleListResponse.ok) throw new Error(peopleList.error || 'Failed to fetch people list.');
-                if (!peopleList || peopleList.length === 0) {
-                    peopleInfoEl.innerHTML = '<p>No people information available for this company.</p>';
-                    return;
+                if (!response.ok) {
+                    throw new Error(peopleData.error || 'Failed to fetch people data.');
                 }
 
-                // 2. Create a fetch request for each person's details
-                const detailPromises = peopleList.map(person =>
-                    fetch(`/api/person-details?personId=${person.person_id}`)
-                        .then(res => res.ok ? res.json() : null) // Return null on error to not break Promise.all
-                );
+                if (peopleData && peopleData.length > 0) {
+                    let peopleHtml = '<ul class="data-list">';
+                    peopleData.forEach(person => {
+                        // --- FIX: Displaying LinkedIn URL ---
+                        const linkedInLink = person.linkedin_url
+                            ? `<a href="${person.linkedin_url}" target="_blank">LinkedIn Profile</a>`
+                            : '<span>No LinkedIn Profile</span>';
 
-                // 3. Wait for all detail requests to complete
-                const peopleWithDetails = await Promise.all(detailPromises);
-
-                // 4. Render the final list with LinkedIn links
-                let peopleHtml = '<ul class="data-list">';
-                peopleWithDetails.forEach((personDetails, index) => {
-                    if (!personDetails) { // Handle cases where a single person detail fetch failed
-                        peopleHtml += `<li>Could not load details for ${peopleList[index].full_name}</li>`;
-                        return;
-                    }
-
-                    const personFromList = peopleList[index]; // Get original data like is_founder
-                    const title = personDetails.title || 'N/A';
-                    const founderBadge = personFromList.is_founder ? ' <strong>(Founder)</strong>' : '';
-
-                    // IMPORTANT: The path to the LinkedIn URL is a guess based on common API structures.
-                    // You may need to inspect the response from `/api/person-details`
-                    // and change `personDetails.socials.linkedin.url` to the correct path.
-                    const linkedinUrl = personDetails.socials?.linkedin?.url;
-                    const linkedinLink = linkedinUrl ? `<a href="${linkedinUrl}" target="_blank">LinkedIn Profile</a>` : 'LinkedIn not available';
-
-                    peopleHtml += `
-                        <li>
-                            <strong>${personDetails.full_name}</strong>${founderBadge}<br>
-                            <small>Title: ${title}</small><br>
-                            <small>${linkedinLink}</small>
-                        </li>
-                    `;
-                });
-                peopleHtml += '</ul>';
-                peopleInfoEl.innerHTML = peopleHtml;
-
+                        peopleHtml += `
+                            <li>
+                                <strong>${person.full_name || 'N/A'}</strong><br>
+                                <small>Title: ${person.current_position_title || 'N/A'}</small><br>
+                                ${linkedInLink}
+                            </li>
+                        `;
+                    });
+                    peopleHtml += '</ul>';
+                    peopleInfoEl.innerHTML = peopleHtml;
+                } else {
+                    peopleInfoEl.innerHTML = '<p>No people information available for this company.</p>';
+                }
             } catch (error) {
-                console.error('Error fetching people details:', error);
+                console.error('Error fetching people:', error);
                 peopleInfoEl.innerHTML = `<p style="color: #d9534f;">Could not load people: ${error.message}</p>`;
             }
         }
