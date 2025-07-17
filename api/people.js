@@ -7,54 +7,80 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: 'Company ID is required' });
   }
 
-  const apiKey = process.env.SPECTER_API_KEY;
+  // --- API Key Configuration ---
+  const specterApiKey = process.env.SPECTER_API_KEY;
+  const brightdataApiKey = process.env.BRIGHTDATA_API_KEY;
+  const brightdataDatasetId = process.env.BRIGHTDATA_DATASET_ID;
 
-  if (!apiKey) {
-    console.error("CRITICAL: SPECTER_API_KEY environment variable not found on the server!");
-    return res.status(500).json({ error: 'API key is not configured on the server.' });
+  if (!specterApiKey) {
+    return res.status(500).json({ error: 'Specter API key is not configured on the server.' });
+  }
+  if (!brightdataApiKey || !brightdataDatasetId) {
+    return res.status(500).json({ error: 'Bright Data API key or Dataset ID is not configured.' });
   }
 
   try {
-    // STEP 1: Get the list of person IDs for the company
-    // --- MODIFICATION HERE ---
-    // Added '?founders=true' to the end of the URL to filter for founders only.
+    // --- STEP 1: Get Founders from Specter ---
     const peopleListUrl = `https://app.tryspecter.com/api/v1/companies/${companyId}/people?founders=true`;
-    
     const peopleListResponse = await fetch(peopleListUrl, {
-      headers: { 'X-API-Key': apiKey },
+      headers: { 'X-API-Key': specterApiKey },
     });
 
     if (!peopleListResponse.ok) {
-      const errorData = await peopleListResponse.json();
-      console.error("Specter People List API returned an error:", errorData);
-      return res.status(peopleListResponse.status).json(errorData);
+      throw new Error(`Specter People List API failed: ${peopleListResponse.statusText}`);
     }
-
     const peopleList = await peopleListResponse.json();
 
     if (!peopleList || peopleList.length === 0) {
-      // This now means "No founders found"
-      return res.status(200).json([]); 
+      return res.status(200).json({ specterData: [], brightDataJob: null });
     }
 
-    // STEP 2: For each person (now just founders), fetch their detailed profile in parallel
+    // --- STEP 2: Get Detailed Profiles from Specter ---
     const personDetailPromises = peopleList.map(person => {
       const personDetailUrl = `https://app.tryspecter.com/api/v1/people/${person.person_id}`;
-      return fetch(personDetailUrl, {
-        headers: { 'X-API-Key': apiKey },
-      }).then(response => {
-        if (!response.ok) return null;
-        return response.json();
-      });
+      return fetch(personDetailUrl, { headers: { 'X-API-Key': specterApiKey } })
+        .then(response => response.ok ? response.json() : null);
     });
+    const successfulPeopleDetails = (await Promise.all(personDetailPromises)).filter(p => p !== null);
 
-    // Wait for all the detailed profile fetches to complete
-    const detailedPeople = await Promise.all(personDetailPromises);
+    // --- STEP 3: Trigger Bright Data LinkedIn Fetch ---
+    const linkedInUrls = successfulPeopleDetails
+      .map(person => person.linkedin_url)
+      .filter(Boolean); // Filter out any null/undefined URLs
 
-    // Filter out any null results from failed individual fetches
-    const successfulPeopleDetails = detailedPeople.filter(p => p !== null);
+    let brightDataResponse = null;
+    if (linkedInUrls.length > 0) {
+      const brightDataPayload = linkedInUrls.map(url => ({ url }));
 
-    return res.status(200).json(successfulPeopleDetails);
+      const brightDataTriggerResponse = await fetch(`https://api.brightdata.com/datasets/v3/trigger?dataset_id=${brightdataDatasetId}&include_errors=true`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${brightdataApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(brightDataPayload),
+      });
+
+      if (!brightDataTriggerResponse.ok) {
+        const errorText = await brightDataTriggerResponse.text();
+        console.error("Bright Data API Error:", errorText);
+        // Don't fail the whole request, just note the error
+        brightDataResponse = { status: 'error', message: 'Failed to trigger Bright Data job.' };
+      } else {
+        const triggerResult = await brightDataTriggerResponse.json();
+        brightDataResponse = {
+          status: 'triggered',
+          delivery_id: triggerResult.delivery_id,
+          message: `Successfully triggered LinkedIn data fetch for ${linkedInUrls.length} founder(s). Delivery ID: ${triggerResult.delivery_id}. Data will be available in your Bright Data dataset shortly.`
+        };
+      }
+    }
+
+    // --- STEP 4: Return Combined Data ---
+    return res.status(200).json({
+      specterData: successfulPeopleDetails,
+      brightDataJob: brightDataResponse
+    });
 
   } catch (error) {
     console.error(`Server-side orchestration for people failed: ${error.message}`);

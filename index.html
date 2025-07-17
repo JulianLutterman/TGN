@@ -127,6 +127,16 @@
                 .data-list li small {
                     color: #555;
                 }
+        /* New style for Bright Data status */
+        #brightdata-status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            border-left: 4px solid #17a2b8;
+            background-color: #eef9fa;
+            color: #0c5460;
+        }
     </style>
 </head>
 <body>
@@ -157,8 +167,10 @@
                 <div id="fundingInfo"></div>
             </div>
             <div class="result-item">
-                <h3>Company People</h3>
+                <h3>Company Founders</h3>
                 <div id="peopleInfo"></div>
+                <!-- New div to show Bright Data job status -->
+                <div id="brightdata-status" style="display: none;"></div>
             </div>
         </div>
     </div>
@@ -174,6 +186,8 @@
             statusDiv.textContent = '';
             statusDiv.className = '';
             resultsDiv.style.display = 'none';
+            document.getElementById('brightdata-status').style.display = 'none';
+
 
             if (!url) {
                 showStatus('Error: Specter URL is required.', 'error');
@@ -222,15 +236,12 @@
             document.getElementById('linkedinLink').innerHTML = data.socials?.linkedin?.url ? `<a href="${data.socials.linkedin.url}" target="_blank">${data.socials.linkedin.url}</a>` : 'Not available';
             document.getElementById('description').textContent = data.description || 'Not available';
 
-            // --- FIX: Using the correct property name `round_details` ---
             const fundingInfoEl = document.getElementById('fundingInfo');
-            // The correct property is `round_details` as per the documentation.
             const fundingRounds = data.funding?.round_details;
 
             if (fundingRounds && fundingRounds.length > 0) {
                 let fundingHtml = '<ul class="data-list">';
                 fundingRounds.forEach(round => {
-                    // Using the properties from the example: `date`, `raised`, `investors`, `type`
                     const date = round.date || 'N/A';
                     const amount = round.raised ? `$${round.raised.toLocaleString()}` : 'Amount N/A';
                     const investors = round.investors?.join(', ') || 'Investors N/A';
@@ -255,15 +266,19 @@
 
         async function fetchAndDisplayPeople(companyId) {
             const peopleInfoEl = document.getElementById('peopleInfo');
-            peopleInfoEl.innerHTML = '<p>Loading people...</p>';
+            const brightdataStatusEl = document.getElementById('brightdata-status');
+            peopleInfoEl.innerHTML = '<p>Loading founders...</p>';
+            brightdataStatusEl.style.display = 'none';
 
             try {
                 const response = await fetch(`/api/people?companyId=${companyId}`);
-                const peopleData = await response.json();
+                const responseData = await response.json(); // The response is now an object
 
                 if (!response.ok) {
-                    throw new Error(peopleData.error || 'Failed to fetch people data.');
+                    throw new Error(responseData.error || 'Failed to fetch people data.');
                 }
+
+                const peopleData = responseData.specterData; // Get the array of people
 
                 if (peopleData && peopleData.length > 0) {
                     let peopleHtml = '<ul class="data-list">';
@@ -283,8 +298,15 @@
                     peopleHtml += '</ul>';
                     peopleInfoEl.innerHTML = peopleHtml;
                 } else {
-                    peopleInfoEl.innerHTML = '<p>No people information available for this company.</p>';
+                    peopleInfoEl.innerHTML = '<p>No founder information available for this company.</p>';
                 }
+
+                // Display the Bright Data job status
+                if (responseData.brightDataJob) {
+                    brightdataStatusEl.textContent = responseData.brightDataJob.message;
+                    brightdataStatusEl.style.display = 'block';
+                }
+
             } catch (error) {
                 console.error('Error fetching people:', error);
                 peopleInfoEl.innerHTML = `<p style="color: #d9534f;">Could not load people: ${error.message}</p>`;
