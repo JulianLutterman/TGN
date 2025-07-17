@@ -1,21 +1,17 @@
 // File: /api/specter.js
-// Using CommonJS syntax (module.exports) for better compatibility.
 
 module.exports = async (req, res) => {
-  // Get the companyId from the query parameter (e.g., /api/specter?id=12345)
   const { id } = req.query;
 
   if (!id) {
     return res.status(400).json({ error: 'Company ID is required' });
   }
 
-  // Get the API key securely from Vercel Environment Variables
   const apiKey = process.env.SPECTER_API_KEY;
 
   if (!apiKey) {
-    // This is a critical server-side error.
-    console.error("SPECTER_API_KEY environment variable not set!");
-    return res.status(500).json({ error: 'API key is not configured on the server' });
+    console.error("CRITICAL: SPECTER_API_KEY environment variable not found on the server!");
+    return res.status(500).json({ error: 'API key is not configured on the server. Please contact the site administrator.' });
   }
 
   const apiUrl = `https://api.tryspecter.com/companies/${id}`;
@@ -25,24 +21,33 @@ module.exports = async (req, res) => {
       method: 'GET',
       headers: {
         'X-API-Key': apiKey,
-        'Accept': 'application/json' // Good practice to specify expected response type
       },
     });
 
-    // Check if the response from Specter is not OK
-    if (!specterResponse.ok) {
-      const errorText = await specterResponse.text();
-      console.error(`Specter API Error (Status: ${specterResponse.status}): ${errorText}`);
-      return res.status(specterResponse.status).json({ error: `Specter API Error: ${errorText}` });
+    // Check if the response from Specter is JSON before trying to parse it.
+    const contentType = specterResponse.headers.get("content-type");
+    if (contentType && contentType.indexOf("application/json") !== -1) {
+      // It's JSON, proceed as normal.
+      const data = await specterResponse.json();
+      if (!specterResponse.ok) {
+        // The JSON contains an error message from Specter
+        console.error("Specter API returned a JSON error:", data);
+        return res.status(specterResponse.status).json(data);
+      }
+      return res.status(200).json(data);
+    } else {
+      // It's NOT JSON. It's probably the HTML error page.
+      // Let's log it to find out what it is.
+      const responseText = await specterResponse.text();
+      console.error("CRITICAL: Specter API did not return JSON. It returned this text/HTML instead:");
+      console.error(responseText); // This will show the HTML in your Vercel logs!
+      
+      // Send a generic error to the frontend.
+      return res.status(502).json({ error: 'Bad Gateway: Received an invalid response from the Specter API.' });
     }
 
-    const data = await specterResponse.json();
-    
-    // Send the data from Specter back to your frontend
-    return res.status(200).json(data);
-
   } catch (error) {
-    console.error(`Server-side fetch error: ${error.message}`);
+    console.error(`Server-side fetch function failed: ${error.message}`);
     return res.status(500).json({ error: `Server error: ${error.message}` });
   }
 };
