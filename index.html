@@ -111,12 +111,12 @@
                 word-break: break-all;
             }
 
-        .funding-list {
+        .data-list {
             list-style-type: none;
             padding-left: 0;
         }
 
-            .funding-list li {
+            .data-list li {
                 background-color: #f9f9f9;
                 border: 1px solid #eee;
                 padding: 10px;
@@ -134,8 +134,6 @@
             <label for="specterUrl">Specter Company URL</label>
             <input type="text" id="specterUrl" placeholder="e.g., https://app.tryspecter.com/signals/company/feed/636dd44daab093538e5c67c6">
         </div>
-
-        <!-- The API Key input has been removed from here -->
 
         <button id="fetchButton">Get Company Info</button>
 
@@ -155,8 +153,13 @@
                 <p id="description"></p>
             </div>
             <div class="result-item">
-                <h3>Funding History</h3>
+                <h3>Investors</h3>
                 <div id="fundingInfo"></div>
+            </div>
+            <!-- New section for Company People -->
+            <div class="result-item">
+                <h3>Company People</h3>
+                <div id="peopleInfo"></div>
             </div>
         </div>
     </div>
@@ -167,7 +170,6 @@
         const statusDiv = document.getElementById('status');
         const resultsDiv = document.getElementById('results');
 
-        // The event listener is now correctly marked as 'async'
         fetchButton.addEventListener('click', async () => {
             const url = specterUrlInput.value.trim();
 
@@ -191,7 +193,6 @@
             const apiUrl = `/api/specter?id=${companyId}`;
 
             try {
-                // The API key is no longer sent from the browser
                 const response = await fetch(apiUrl);
 
                 if (!response.ok) {
@@ -237,32 +238,67 @@
 
             descriptionEl.textContent = data.description || 'Not available';
 
-            // The documentation doesn't specify the exact path to funding rounds.
-            // This assumes a common structure: `data.funding.funding_rounds`.
-            // You may need to adjust this based on the actual API response.
-            const fundingRounds = data.funding?.funding_rounds;
-            if (fundingRounds && fundingRounds.length > 0) {
-                let fundingHtml = '<ul class="funding-list">';
-                fundingRounds.forEach(round => {
-                    const date = round.date || 'N/A';
-                    const amount = round.amount_raised_usd ? `$${round.amount_raised_usd.toLocaleString()}` : 'N/A';
-                    const investors = round.investors?.join(', ') || 'N/A';
-
-                    fundingHtml += `
-                        <li>
-                            <strong>Date:</strong> ${date}<br>
-                            <strong>Amount Raised:</strong> ${amount}<br>
-                            <strong>Investors:</strong> ${investors}
-                        </li>
-                    `;
+            // --- FIX: Displaying Funding Information ---
+            // The documentation shows an `investors` array, not detailed funding rounds.
+            const investors = data.investors;
+            if (investors && investors.length > 0) {
+                let fundingHtml = '<ul class="data-list">';
+                investors.forEach(investor => {
+                    fundingHtml += `<li>${investor}</li>`;
                 });
                 fundingHtml += '</ul>';
                 fundingInfoEl.innerHTML = fundingHtml;
             } else {
-                fundingInfoEl.innerHTML = '<p>No funding information available.</p>';
+                fundingInfoEl.innerHTML = '<p>No investor information available.</p>';
             }
 
             resultsDiv.style.display = 'block';
+
+            // --- NEW: Fetch and display people after the main company info is shown ---
+            // We use the company ID from the successful response to make the next call.
+            fetchAndDisplayPeople(data.id);
+        }
+
+        // --- NEW: Function to fetch and display people ---
+        async function fetchAndDisplayPeople(companyId) {
+            const peopleInfoEl = document.getElementById('peopleInfo');
+            peopleInfoEl.innerHTML = '<p>Loading people...</p>';
+
+            try {
+                // Call our new serverless function
+                const response = await fetch(`/api/people?companyId=${companyId}`);
+                const peopleData = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(peopleData.error || 'Failed to fetch people data.');
+                }
+
+                if (peopleData && peopleData.length > 0) {
+                    let peopleHtml = '<ul class="data-list">';
+                    peopleData.forEach(person => {
+                        const title = person.title || 'N/A';
+                        const founderBadge = person.is_founder ? ' <strong>(Founder)</strong>' : '';
+
+                        // NOTE: The /people endpoint does not provide a LinkedIn URL.
+                        // To get it, another API call to a /people/{person_id} endpoint
+                        // would be needed, using the `person.person_id`.
+                        peopleHtml += `
+                            <li>
+                                <strong>${person.full_name}</strong>${founderBadge}<br>
+                                <small>Title: ${title}</small>
+                            </li>
+                        `;
+                    });
+                    peopleHtml += '</ul>';
+                    peopleInfoEl.innerHTML = peopleHtml;
+                } else {
+                    peopleInfoEl.innerHTML = '<p>No people information available for this company.</p>';
+                }
+
+            } catch (error) {
+                console.error('Error fetching people:', error);
+                peopleInfoEl.innerHTML = `<p style="color: #d9534f;">Could not load people: ${error.message}</p>`;
+            }
         }
     </script>
 
