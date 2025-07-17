@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Specter Company Info Fetcher</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            background-color: #f4f7f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #1a2b4d;
+            border-bottom: 2px solid #e1e5e8;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #555;
+        }
+
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+
+            button:hover {
+                background-color: #0056b3;
+            }
+
+        #status {
+            margin-top: 20px;
+            font-weight: bold;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .status-error {
+            color: #d9534f;
+            background-color: #f2dede;
+        }
+
+        .status-success {
+            color: #5cb85c;
+            background-color: #dff0d8;
+        }
+
+        .status-loading {
+            color: #31708f;
+            background-color: #d9edf7;
+        }
+
+        #results {
+            margin-top: 25px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+
+        .result-item {
+            margin-bottom: 15px;
+        }
+
+            .result-item h3 {
+                margin: 0 0 5px 0;
+                color: #1a2b4d;
+            }
+
+            .result-item p, .result-item a {
+                margin: 0;
+                word-break: break-all;
+            }
+
+        .funding-list {
+            list-style-type: none;
+            padding-left: 0;
+        }
+
+            .funding-list li {
+                background-color: #f9f9f9;
+                border: 1px solid #eee;
+                padding: 10px;
+                margin-bottom: 10px;
+                border-radius: 4px;
+            }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Specter Company Info Fetcher</h1>
+
+        <div class="input-group">
+            <label for="specterUrl">Specter Company URL</label>
+            <input type="text" id="specterUrl" placeholder="e.g., https://app.tryspecter.com/signals/company/feed/636dd44daab093538e5c67c6">
+        </div>
+
+        <div class="input-group">
+            <label for="apiKey">Your Specter API Key</label>
+            <input type="password" id="apiKey" placeholder="Enter your X-API-Key here">
+        </div>
+
+        <button id="fetchButton">Get Company Info</button>
+
+        <div id="status"></div>
+
+        <div id="results" style="display: none;">
+            <div class="result-item">
+                <h3>Website</h3>
+                <p id="websiteLink"></p>
+            </div>
+            <div class="result-item">
+                <h3>LinkedIn</h3>
+                <p id="linkedinLink"></p>
+            </div>
+            <div class="result-item">
+                <h3>Company Description</h3>
+                <p id="description"></p>
+            </div>
+            <div class="result-item">
+                <h3>Funding History</h3>
+                <div id="fundingInfo"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const fetchButton = document.getElementById('fetchButton');
+        const specterUrlInput = document.getElementById('specterUrl');
+        const apiKeyInput = document.getElementById('apiKey');
+        const statusDiv = document.getElementById('status');
+        const resultsDiv = document.getElementById('results');
+
+        fetchButton.addEventListener('click', async () => {
+            const url = specterUrlInput.value.trim();
+            const apiKey = apiKeyInput.value.trim();
+
+            // Clear previous results and status
+            statusDiv.textContent = '';
+            statusDiv.className = '';
+            resultsDiv.style.display = 'none';
+
+            // --- 1. Input Validation ---
+            if (!apiKey) {
+                showStatus('Error: API Key is required.', 'error');
+                return;
+            }
+            if (!url) {
+                showStatus('Error: Specter URL is required.', 'error');
+                return;
+            }
+
+            // --- 2. Extract Company ID from URL ---
+            const companyId = extractCompanyId(url);
+            if (!companyId) {
+                showStatus('Error: Could not parse Company ID from the URL. Please use a valid format.', 'error');
+                return;
+            }
+
+            // --- 3. Fetch Data from API ---
+            showStatus(`Fetching data for company ID: ${companyId}...`, 'loading');
+
+            const apiUrl = `https://api.tryspecter.com/companies/${companyId}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'GET',
+                    headers: {
+                        'X-API-Key': apiKey
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API request failed with status ${response.status} (${response.statusText})`);
+                }
+
+                const data = await response.json();
+                showStatus('Success! Data loaded.', 'success');
+                displayResults(data);
+
+            } catch (error) {
+                console.error('Fetch error:', error);
+                showStatus(`Error: ${error.message}. Check the console for more details.`, 'error');
+            }
+        });
+
+        function extractCompanyId(url) {
+            // Example URL: https://app.tryspecter.com/signals/company/feed/636dd44daab093538e5c67c6?index=0&tab=1
+            // We need the part after "/feed/"
+            try {
+                const match = url.match(/\/feed\/([a-f0-9]+)/);
+                return match ? match[1] : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function showStatus(message, type) {
+            statusDiv.textContent = message;
+            statusDiv.className = `status-${type}`;
+        }
+
+        function displayResults(data) {
+            // --- 4. Populate the results section ---
+            const websiteLinkEl = document.getElementById('websiteLink');
+            const linkedinLinkEl = document.getElementById('linkedinLink');
+            const descriptionEl = document.getElementById('description');
+            const fundingInfoEl = document.getElementById('fundingInfo');
+
+            // Website
+            const websiteUrl = data.website?.url;
+            websiteLinkEl.innerHTML = websiteUrl ? `<a href="${websiteUrl}" target="_blank">${websiteUrl}</a>` : 'Not available';
+
+            // LinkedIn
+            const linkedinUrl = data.socials?.linkedin?.url;
+            linkedinLinkEl.innerHTML = linkedinUrl ? `<a href="${linkedinUrl}" target="_blank">${linkedinUrl}</a>` : 'Not available';
+
+            // Description
+            descriptionEl.textContent = data.description || 'Not available';
+
+            // Funding
+            // NOTE: The exact structure is assumed to be `data.funding.funding_rounds` based on API best practices.
+            const fundingRounds = data.funding?.funding_rounds;
+            if (fundingRounds && fundingRounds.length > 0) {
+                let fundingHtml = '<ul class="funding-list">';
+                fundingRounds.forEach(round => {
+                    const date = round.date || 'N/A';
+                    const amount = round.amount_raised_usd ? `$${round.amount_raised_usd.toLocaleString()}` : 'N/A';
+                    const investors = round.investors?.join(', ') || 'N/A';
+
+                    fundingHtml += `
+                        <li>
+                            <strong>Date:</strong> ${date}<br>
+                            <strong>Amount Raised:</strong> ${amount}<br>
+                            <strong>Investors:</strong> ${investors}
+                        </li>
+                    `;
+                });
+                fundingHtml += '</ul>';
+                fundingInfoEl.innerHTML = fundingHtml;
+            } else {
+                fundingInfoEl.innerHTML = '<p>No funding information available.</p>';
+            }
+
+            resultsDiv.style.display = 'block';
+        }
+    </script>
+
+</body>
+</html>
