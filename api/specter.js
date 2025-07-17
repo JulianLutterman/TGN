@@ -7,7 +7,7 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: 'Company ID is required' });
   }
 
-  const apiKey = process.env.SPECTER_API_KEY;
+  const apiKey = "2582b8f9ce49d89793f40f4e5abcd303f94e9a16c9cd47f87919a603d29e2603";
 
   if (!apiKey) {
     console.error("CRITICAL: SPECTER_API_KEY environment variable not found on the server!");
