@@ -45,7 +45,7 @@
             color: #555;
         }
 
-        input[type="text"], input[type="password"] {
+        input[type="text"] {
             width: 100%;
             padding: 10px;
             border: 1px solid #ccc;
@@ -135,10 +135,7 @@
             <input type="text" id="specterUrl" placeholder="e.g., https://app.tryspecter.com/signals/company/feed/636dd44daab093538e5c67c6">
         </div>
 
-        <div class="input-group">
-            <label for="apiKey">Your Specter API Key</label>
-            <input type="password" id="apiKey" placeholder="Enter your X-API-Key here">
-        </div>
+        <!-- The API Key input has been removed from here -->
 
         <button id="fetchButton">Get Company Info</button>
 
@@ -165,30 +162,107 @@
     </div>
 
     <script>
-        // --- 3. Fetch Data from API ---
-        showStatus(`Fetching data for company ID: ${companyId}...`, 'loading');
+        const fetchButton = document.getElementById('fetchButton');
+        const specterUrlInput = document.getElementById('specterUrl');
+        const statusDiv = document.getElementById('status');
+        const resultsDiv = document.getElementById('results');
 
-        // The NEW API URL points to YOUR serverless function
-        // We pass the companyId as a query parameter
-        const apiUrl = `/api/specter?id=${companyId}`;
+        // The event listener is now correctly marked as 'async'
+        fetchButton.addEventListener('click', async () => {
+            const url = specterUrlInput.value.trim();
 
-        try {
-            // NOTICE: We no longer send the X-API-Key header from the browser!
-            // It is now handled securely by the backend.
-            const response = await fetch(apiUrl);
+            statusDiv.textContent = '';
+            statusDiv.className = '';
+            resultsDiv.style.display = 'none';
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `Request failed with status ${response.status}`);
+            if (!url) {
+                showStatus('Error: Specter URL is required.', 'error');
+                return;
             }
 
-            const data = await response.json();
-            showStatus('Success! Data loaded.', 'success');
-            displayResults(data);
+            const companyId = extractCompanyId(url);
+            if (!companyId) {
+                showStatus('Error: Could not parse Company ID from the URL. Please use a valid format.', 'error');
+                return;
+            }
 
-        } catch (error) {
-            console.error('Fetch error:', error);
-            showStatus(`Error: ${error.message}. Check the console for more details.`, 'error');
+            showStatus(`Fetching data for company ID: ${companyId}...`, 'loading');
+
+            const apiUrl = `/api/specter?id=${companyId}`;
+
+            try {
+                // The API key is no longer sent from the browser
+                const response = await fetch(apiUrl);
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `Request failed with status ${response.status}`);
+                }
+
+                const data = await response.json();
+                showStatus('Success! Data loaded.', 'success');
+                displayResults(data);
+
+            } catch (error) {
+                console.error('Fetch error:', error);
+                showStatus(`Error: ${error.message}. Check the console for more details.`, 'error');
+            }
+        });
+
+        function extractCompanyId(url) {
+            try {
+                const match = url.match(/\/feed\/([a-f0-9]+)/);
+                return match ? match[1] : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function showStatus(message, type) {
+            statusDiv.textContent = message;
+            statusDiv.className = `status-${type}`;
+        }
+
+        function displayResults(data) {
+            const websiteLinkEl = document.getElementById('websiteLink');
+            const linkedinLinkEl = document.getElementById('linkedinLink');
+            const descriptionEl = document.getElementById('description');
+            const fundingInfoEl = document.getElementById('fundingInfo');
+
+            const websiteUrl = data.website?.url;
+            websiteLinkEl.innerHTML = websiteUrl ? `<a href="${websiteUrl}" target="_blank">${websiteUrl}</a>` : 'Not available';
+
+            const linkedinUrl = data.socials?.linkedin?.url;
+            linkedinLinkEl.innerHTML = linkedinUrl ? `<a href="${linkedinUrl}" target="_blank">${linkedinUrl}</a>` : 'Not available';
+
+            descriptionEl.textContent = data.description || 'Not available';
+
+            // The documentation doesn't specify the exact path to funding rounds.
+            // This assumes a common structure: `data.funding.funding_rounds`.
+            // You may need to adjust this based on the actual API response.
+            const fundingRounds = data.funding?.funding_rounds;
+            if (fundingRounds && fundingRounds.length > 0) {
+                let fundingHtml = '<ul class="funding-list">';
+                fundingRounds.forEach(round => {
+                    const date = round.date || 'N/A';
+                    const amount = round.amount_raised_usd ? `$${round.amount_raised_usd.toLocaleString()}` : 'N/A';
+                    const investors = round.investors?.join(', ') || 'N/A';
+
+                    fundingHtml += `
+                        <li>
+                            <strong>Date:</strong> ${date}<br>
+                            <strong>Amount Raised:</strong> ${amount}<br>
+                            <strong>Investors:</strong> ${investors}
+                        </li>
+                    `;
+                });
+                fundingHtml += '</ul>';
+                fundingInfoEl.innerHTML = fundingHtml;
+            } else {
+                fundingInfoEl.innerHTML = '<p>No funding information available.</p>';
+            }
+
+            resultsDiv.style.display = 'block';
         }
     </script>
 
