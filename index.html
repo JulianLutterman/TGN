@@ -222,16 +222,19 @@
             document.getElementById('linkedinLink').innerHTML = data.socials?.linkedin?.url ? `<a href="${data.socials.linkedin.url}" target="_blank">${data.socials.linkedin.url}</a>` : 'Not available';
             document.getElementById('description').textContent = data.description || 'Not available';
 
-            // --- FIX: Displaying Detailed Funding History ---
+            // --- FIX: Using the correct property name `round_details` ---
             const fundingInfoEl = document.getElementById('fundingInfo');
-            const fundingRounds = data.funding?.funding_rounds; // Access the detailed rounds
+            // The correct property is `round_details` as per the documentation.
+            const fundingRounds = data.funding?.round_details;
+
             if (fundingRounds && fundingRounds.length > 0) {
                 let fundingHtml = '<ul class="data-list">';
                 fundingRounds.forEach(round => {
+                    // Using the properties from the example: `date`, `raised`, `investors`, `type`
                     const date = round.date || 'N/A';
-                    const amount = round.amount_raised_usd ? `$${round.amount_raised_usd.toLocaleString()}` : 'Amount N/A';
+                    const amount = round.raised ? `$${round.raised.toLocaleString()}` : 'Amount N/A';
                     const investors = round.investors?.join(', ') || 'Investors N/A';
-                    const roundType = round.investment_type ? ` (${round.investment_type})` : '';
+                    const roundType = round.type ? ` (${round.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())})` : '';
 
                     fundingHtml += `
                         <li>
@@ -255,7 +258,6 @@
             peopleInfoEl.innerHTML = '<p>Loading people...</p>';
 
             try {
-                // This single call now returns fully detailed people profiles
                 const response = await fetch(`/api/people?companyId=${companyId}`);
                 const peopleData = await response.json();
 
@@ -266,7 +268,6 @@
                 if (peopleData && peopleData.length > 0) {
                     let peopleHtml = '<ul class="data-list">';
                     peopleData.forEach(person => {
-                        // --- FIX: Displaying LinkedIn URL ---
                         const linkedInLink = person.linkedin_url
                             ? `<a href="${person.linkedin_url}" target="_blank">LinkedIn Profile</a>`
                             : '<span>No LinkedIn Profile</span>';
