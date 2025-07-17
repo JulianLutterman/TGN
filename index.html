@@ -129,16 +129,12 @@
 
     <div class="container">
         <h1>Specter Company Info Fetcher</h1>
-
         <div class="input-group">
             <label for="specterUrl">Specter Company URL</label>
             <input type="text" id="specterUrl" placeholder="e.g., https://app.tryspecter.com/signals/company/feed/636dd44daab093538e5c67c6">
         </div>
-
         <button id="fetchButton">Get Company Info</button>
-
         <div id="status"></div>
-
         <div id="results" style="display: none;">
             <div class="result-item">
                 <h3>Website</h3>
@@ -153,10 +149,9 @@
                 <p id="description"></p>
             </div>
             <div class="result-item">
-                <h3>Investors</h3>
+                <h3>Funding History</h3>
                 <div id="fundingInfo"></div>
             </div>
-            <!-- New section for Company People -->
             <div class="result-item">
                 <h3>Company People</h3>
                 <div id="peopleInfo"></div>
@@ -172,7 +167,6 @@
 
         fetchButton.addEventListener('click', async () => {
             const url = specterUrlInput.value.trim();
-
             statusDiv.textContent = '';
             statusDiv.className = '';
             resultsDiv.style.display = 'none';
@@ -184,39 +178,30 @@
 
             const companyId = extractCompanyId(url);
             if (!companyId) {
-                showStatus('Error: Could not parse Company ID from the URL. Please use a valid format.', 'error');
+                showStatus('Error: Could not parse Company ID from the URL.', 'error');
                 return;
             }
 
             showStatus(`Fetching data for company ID: ${companyId}...`, 'loading');
 
-            const apiUrl = `/api/specter?id=${companyId}`;
-
             try {
-                const response = await fetch(apiUrl);
-
+                const response = await fetch(`/api/specter?id=${companyId}`);
                 if (!response.ok) {
                     const errorData = await response.json();
                     throw new Error(errorData.error || `Request failed with status ${response.status}`);
                 }
-
                 const data = await response.json();
                 showStatus('Success! Data loaded.', 'success');
                 displayResults(data);
-
             } catch (error) {
                 console.error('Fetch error:', error);
-                showStatus(`Error: ${error.message}. Check the console for more details.`, 'error');
+                showStatus(`Error: ${error.message}.`, 'error');
             }
         });
 
         function extractCompanyId(url) {
-            try {
-                const match = url.match(/\/feed\/([a-f0-9]+)/);
-                return match ? match[1] : null;
-            } catch (e) {
-                return null;
-            }
+            const match = url.match(/\/feed\/([a-f0-9]+)/);
+            return match ? match[1] : null;
         }
 
         function showStatus(message, type) {
@@ -225,78 +210,102 @@
         }
 
         function displayResults(data) {
-            const websiteLinkEl = document.getElementById('websiteLink');
-            const linkedinLinkEl = document.getElementById('linkedinLink');
-            const descriptionEl = document.getElementById('description');
+            document.getElementById('websiteLink').innerHTML = data.website?.url ? `<a href="${data.website.url}" target="_blank">${data.website.url}</a>` : 'Not available';
+            document.getElementById('linkedinLink').innerHTML = data.socials?.linkedin?.url ? `<a href="${data.socials.linkedin.url}" target="_blank">${data.socials.linkedin.url}</a>` : 'Not available';
+            document.getElementById('description').textContent = data.description || 'Not available';
+
+            // --- FIX: Displaying Detailed Funding History ---
             const fundingInfoEl = document.getElementById('fundingInfo');
 
-            const websiteUrl = data.website?.url;
-            websiteLinkEl.innerHTML = websiteUrl ? `<a href="${websiteUrl}" target="_blank">${websiteUrl}</a>` : 'Not available';
+            // **HOW TO DEBUG**: Open the browser console. This line will print the funding object.
+            // You can inspect it to find the correct path to the array of rounds.
+            console.log('Inspecting funding object:', data.funding);
 
-            const linkedinUrl = data.socials?.linkedin?.url;
-            linkedinLinkEl.innerHTML = linkedinUrl ? `<a href="${linkedinUrl}" target="_blank">${linkedinUrl}</a>` : 'Not available';
+            // This path is a common pattern. If it's different (e.g., `data.funding.funding_rounds`),
+            // you can find the correct path from the console.log above and change it here.
+            const fundingRounds = data.funding?.rounds;
 
-            descriptionEl.textContent = data.description || 'Not available';
-
-            // --- FIX: Displaying Funding Information ---
-            // The documentation shows an `investors` array, not detailed funding rounds.
-            const investors = data.investors;
-            if (investors && investors.length > 0) {
+            if (fundingRounds && fundingRounds.length > 0) {
                 let fundingHtml = '<ul class="data-list">';
-                investors.forEach(investor => {
-                    fundingHtml += `<li>${investor}</li>`;
+                fundingRounds.forEach(round => {
+                    const date = round.announced_on || 'N/A';
+                    const amount = round.raised_amount_usd ? `$${round.raised_amount_usd.toLocaleString()}` : 'Undisclosed';
+                    const investors = round.investor_names?.join(', ') || 'N/A';
+                    const roundType = round.investment_type || 'Funding Round';
+
+                    fundingHtml += `
+                        <li>
+                            <strong>${roundType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</strong> on ${date}<br>
+                            <strong>Amount Raised:</strong> ${amount}<br>
+                            <strong>Investors:</strong> ${investors}
+                        </li>
+                    `;
                 });
                 fundingHtml += '</ul>';
                 fundingInfoEl.innerHTML = fundingHtml;
             } else {
-                fundingInfoEl.innerHTML = '<p>No investor information available.</p>';
+                fundingInfoEl.innerHTML = '<p>No detailed funding history available.</p>';
             }
 
             resultsDiv.style.display = 'block';
-
-            // --- NEW: Fetch and display people after the main company info is shown ---
-            // We use the company ID from the successful response to make the next call.
             fetchAndDisplayPeople(data.id);
         }
 
-        // --- NEW: Function to fetch and display people ---
         async function fetchAndDisplayPeople(companyId) {
             const peopleInfoEl = document.getElementById('peopleInfo');
             peopleInfoEl.innerHTML = '<p>Loading people...</p>';
 
             try {
-                // Call our new serverless function
-                const response = await fetch(`/api/people?companyId=${companyId}`);
-                const peopleData = await response.json();
+                // 1. Get the list of people (with their IDs)
+                const peopleListResponse = await fetch(`/api/people?companyId=${companyId}`);
+                const peopleList = await peopleListResponse.json();
 
-                if (!response.ok) {
-                    throw new Error(peopleData.error || 'Failed to fetch people data.');
-                }
-
-                if (peopleData && peopleData.length > 0) {
-                    let peopleHtml = '<ul class="data-list">';
-                    peopleData.forEach(person => {
-                        const title = person.title || 'N/A';
-                        const founderBadge = person.is_founder ? ' <strong>(Founder)</strong>' : '';
-
-                        // NOTE: The /people endpoint does not provide a LinkedIn URL.
-                        // To get it, another API call to a /people/{person_id} endpoint
-                        // would be needed, using the `person.person_id`.
-                        peopleHtml += `
-                            <li>
-                                <strong>${person.full_name}</strong>${founderBadge}<br>
-                                <small>Title: ${title}</small>
-                            </li>
-                        `;
-                    });
-                    peopleHtml += '</ul>';
-                    peopleInfoEl.innerHTML = peopleHtml;
-                } else {
+                if (!peopleListResponse.ok) throw new Error(peopleList.error || 'Failed to fetch people list.');
+                if (!peopleList || peopleList.length === 0) {
                     peopleInfoEl.innerHTML = '<p>No people information available for this company.</p>';
+                    return;
                 }
+
+                // 2. Create a fetch request for each person's details
+                const detailPromises = peopleList.map(person =>
+                    fetch(`/api/person-details?personId=${person.person_id}`)
+                        .then(res => res.ok ? res.json() : null) // Return null on error to not break Promise.all
+                );
+
+                // 3. Wait for all detail requests to complete
+                const peopleWithDetails = await Promise.all(detailPromises);
+
+                // 4. Render the final list with LinkedIn links
+                let peopleHtml = '<ul class="data-list">';
+                peopleWithDetails.forEach((personDetails, index) => {
+                    if (!personDetails) { // Handle cases where a single person detail fetch failed
+                        peopleHtml += `<li>Could not load details for ${peopleList[index].full_name}</li>`;
+                        return;
+                    }
+
+                    const personFromList = peopleList[index]; // Get original data like is_founder
+                    const title = personDetails.title || 'N/A';
+                    const founderBadge = personFromList.is_founder ? ' <strong>(Founder)</strong>' : '';
+
+                    // IMPORTANT: The path to the LinkedIn URL is a guess based on common API structures.
+                    // You may need to inspect the response from `/api/person-details`
+                    // and change `personDetails.socials.linkedin.url` to the correct path.
+                    const linkedinUrl = personDetails.socials?.linkedin?.url;
+                    const linkedinLink = linkedinUrl ? `<a href="${linkedinUrl}" target="_blank">LinkedIn Profile</a>` : 'LinkedIn not available';
+
+                    peopleHtml += `
+                        <li>
+                            <strong>${personDetails.full_name}</strong>${founderBadge}<br>
+                            <small>Title: ${title}</small><br>
+                            <small>${linkedinLink}</small>
+                        </li>
+                    `;
+                });
+                peopleHtml += '</ul>';
+                peopleInfoEl.innerHTML = peopleHtml;
 
             } catch (error) {
-                console.error('Error fetching people:', error);
+                console.error('Error fetching people details:', error);
                 peopleInfoEl.innerHTML = `<p style="color: #d9534f;">Could not load people: ${error.message}</p>`;
             }
         }
