@@ -1,6 +1,7 @@
 // File: /api/specter.js
+// Using CommonJS syntax (module.exports) for better compatibility.
 
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
   // Get the companyId from the query parameter (e.g., /api/specter?id=12345)
   const { id } = req.query;
 
@@ -12,6 +13,8 @@ export default async function handler(req, res) {
   const apiKey = process.env.SPECTER_API_KEY;
 
   if (!apiKey) {
+    // This is a critical server-side error.
+    console.error("SPECTER_API_KEY environment variable not set!");
     return res.status(500).json({ error: 'API key is not configured on the server' });
   }
 
@@ -22,25 +25,24 @@ export default async function handler(req, res) {
       method: 'GET',
       headers: {
         'X-API-Key': apiKey,
+        'Accept': 'application/json' // Good practice to specify expected response type
       },
     });
 
+    // Check if the response from Specter is not OK
     if (!specterResponse.ok) {
-      // Forward the error from the Specter API
       const errorText = await specterResponse.text();
+      console.error(`Specter API Error (Status: ${specterResponse.status}): ${errorText}`);
       return res.status(specterResponse.status).json({ error: `Specter API Error: ${errorText}` });
     }
 
     const data = await specterResponse.json();
-
-    // IMPORTANT: Set CORS headers on YOUR response to allow your frontend to access it
-    res.setHeader('Access-Control-Allow-Origin', '*'); // Or be more specific: 'https://tgn-three.vercel.app'
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     
     // Send the data from Specter back to your frontend
     return res.status(200).json(data);
 
   } catch (error) {
+    console.error(`Server-side fetch error: ${error.message}`);
     return res.status(500).json({ error: `Server error: ${error.message}` });
   }
-}
+};
