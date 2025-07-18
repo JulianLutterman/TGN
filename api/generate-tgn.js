@@ -1,79 +1,83 @@
 // File: /api/generate-tgn.js
 
-const OpenAI = require('openai');
+// Helper function to format date for the prompt
+function formatDate(dateString) {
+    if (!dateString) return 'N/A';
+    try {
+        // Handles both 'YYYY-MM-DD' and full ISO strings
+        return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+    } catch (e) {
+        return dateString; // Return original if it's not a valid date
+    }
+}
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Helper function to build the user prompt string
+function buildUserPrompt(initials, growthMetrics, companyData, founderData) {
+    let prompt = `### CONTEXT\n`;
+    prompt += `- User Initials: ${initials}\n`;
+    prompt += `- Generation Date: ${new Date().toLocaleDateString('en-GB')}\n\n`; // DD/MM/YYYY format
 
-// Helper function to format the user prompt from raw data
-function buildUserPrompt(initials, growthMetrics, companyData, peopleData) {
-    const today = new Date();
-    const formattedDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${String(today.getFullYear()).slice(-2)}`;
-
-    let prompt = `USER INITIALS: ${initials}\n`;
-    prompt += `CURRENT DATE: ${formattedDate}\n\n`;
-
-    prompt += `COMPANY DATA:\n`;
+    prompt += `### COMPANY DATA\n`;
     prompt += `- Name: ${companyData.name || 'N/A'}\n`;
     prompt += `- Description: ${companyData.description || 'N/A'}\n`;
     prompt += `- Website: ${companyData.website?.url || 'N/A'}\n`;
     prompt += `- LinkedIn: ${companyData.socials?.linkedin?.url || 'N/A'}\n\n`;
 
-    prompt += `FUNDING HISTORY:\n`;
+    if (growthMetrics) {
+        prompt += `### GROWTH METRICS (User Input)\n`;
+        prompt += `${growthMetrics}\n\n`;
+    } else {
+        prompt += `### GROWTH METRICS (User Input)\n`;
+        prompt += `No specific growth metrics provided.\n\n`;
+    }
+
+    prompt += `### FUNDING HISTORY\n`;
     const fundingRounds = companyData.funding?.round_details;
     if (fundingRounds && fundingRounds.length > 0) {
         fundingRounds.forEach(round => {
             const date = round.date || 'N/A';
             const amount = round.raised ? `$${round.raised.toLocaleString()}` : 'Amount N/A';
             const investors = round.investors?.join(', ') || 'Investors N/A';
-            const roundType = round.type ? ` (${round.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())})` : '';
-            prompt += `- Round: ${date}${roundType}: ${amount}. Investors: ${investors}\n`;
+            const roundType = round.type ? round.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'N/A';
+            prompt += `- ${date} (${roundType}): ${amount}. Investors: ${investors}\n`;
         });
     } else {
-        prompt += `- No funding history available.\n`;
+        prompt += `No funding history available.\n`;
     }
     prompt += `\n`;
 
-    prompt += `FOUNDER PROFILES:\n`;
-    if (peopleData && peopleData.length > 0) {
-        peopleData.forEach((person, index) => {
-            prompt += `--- Founder ${index + 1} ---\n`;
-            prompt += `Name: ${person.full_name || 'N/A'}\n`;
-            prompt += `LinkedIn: ${person.linkedin_url || 'N/A'}\n`;
-
-            prompt += `Experience:\n`;
+    prompt += `### FOUNDER PROFILES\n`;
+    if (founderData && founderData.length > 0) {
+        founderData.forEach((person, index) => {
+            prompt += `---\n`;
+            prompt += `#### Founder ${index + 1}: ${person.full_name || 'N/A'}\n`;
+            prompt += `- LinkedIn: ${person.linkedin_url || 'N/A'}\n\n`;
+            prompt += `**Work Experience:**\n`;
             if (person.experience && person.experience.length > 0) {
                 person.experience.forEach(exp => {
-                    const startDate = exp.start_date ? new Date(exp.start_date).toLocaleDateString('en-GB') : 'N/A';
-                    const endDate = exp.is_current ? 'Present' : (exp.end_date ? new Date(exp.end_date).toLocaleDateString('en-GB') : 'N/A');
-                    prompt += `  - ${exp.title || 'N/A'} at ${exp.company_name || 'N/A'} (${startDate} - ${endDate})\n`;
-                    if (exp.description) {
-                        prompt += `    Description: ${exp.description.trim().replace(/\n/g, ' ')}\n`;
-                    }
+                    const startDate = formatDate(exp.start_date);
+                    const endDate = exp.is_current ? 'Present' : formatDate(exp.end_date);
+                    prompt += `- ${exp.title || 'N/A'} at ${exp.company_name || 'N/A'} (${startDate} - ${endDate})\n`;
                 });
             } else {
-                prompt += `  - No work experience available.\n`;
+                prompt += `No work experience available.\n`;
             }
 
-            prompt += `Education:\n`;
+            prompt += `\n**Education:**\n`;
             if (person.education && person.education.length > 0) {
                 person.education.forEach(edu => {
-                    const startDate = edu.start_date ? new Date(edu.start_date).getFullYear() : 'N/A';
-                    const endDate = edu.end_date ? new Date(edu.end_date).getFullYear() : 'N/A';
-                    prompt += `  - ${edu.degree_title || 'Degree N/A'} at ${edu.name || 'N/A'} (${startDate} - ${endDate})\n`;
+                    const startDate = formatDate(edu.start_date);
+                    const endDate = formatDate(edu.end_date);
+                    prompt += `- ${edu.degree_title || 'Degree N/A'} at ${edu.name || 'School N/A'} (${startDate} - ${endDate})\n`;
                 });
             } else {
-                prompt += `  - No education history available.\n`;
+                prompt += `No education history available.\n`;
             }
             prompt += `\n`;
         });
     } else {
-        prompt += `- No founder information available.\n\n`;
+        prompt += `No founder information available.\n`;
     }
-
-    prompt += `USER-PROVIDED GROWTH METRICS:\n`;
-    prompt += `${growthMetrics || 'No specific growth metrics provided.'}\n`;
 
     return prompt;
 }
@@ -83,19 +87,30 @@ module.exports = async (req, res) => {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
-    if (!process.env.OPENAI_API_KEY) {
+    const openAIApiKey = process.env.OPENAI_API_KEY;
+    if (!openAIApiKey) {
         console.error("CRITICAL: OPENAI_API_KEY environment variable not found!");
-        return res.status(500).json({ error: 'AI service is not configured on the server.' });
+        return res.status(500).json({ error: 'Server configuration error: Missing OpenAI API key.' });
     }
 
     try {
-        const { initials, growthMetrics, companyData, peopleData } = req.body;
+        const { initials, growthMetrics, companyData, founderData } = req.body;
 
-        if (!initials || !companyData || !peopleData) {
-            return res.status(400).json({ error: 'Missing required data for generation.' });
+        if (!initials || !companyData || !founderData) {
+            return res.status(400).json({ error: 'Missing required data: initials, companyData, or founderData.' });
         }
 
-        const systemPrompt = `For each Letter in TGN, you should give a score from 0-1. Your total TGN score should be the sum of the three T, G, and N scores. Please find the criteria on how to assign scores below:
+        const systemPrompt = `### WHO ARE YOU
+You are a Venture Capital Analyst writing a first initial screening note (internally called TGN Note) on a startup.
+
+### INPUT
+You will be given a summary of a specific company, this summary includes the company name, a description of the product, its founders, their work experience and education, detail on the company's previous investment rounds, and in some cases details on the company's financial growth trajectory so far.
+You will also receive the current data and the user's initials
+
+### TASK
+You will output a TGN Note, this stands for Team Growth Network. Team stands for how good the founders are on paper, Growth stands for how strong their growth has been so far, and Network stands for who has invested in them in the past.
+This note is just for initial screening and should be concise.
+For each Letter in TGN, you should give a score from 0-1. Your total TGN score should be the sum of the three T, G, and N scores. Please find the criteria on how to assign scores below:
 
 ### SCORING CRITERIA
 **TGN Criteria**
@@ -196,24 +211,43 @@ G 0.5 $217k ARR (19% MoM growth). 27 paying customers with $8k ACV and $350 CAC.
 
 N 0.25 Raised $1m pre-seed from US angels.`;
 
-        const userPrompt = buildUserPrompt(initials, growthMetrics, companyData, peopleData);
+        const userPrompt = buildUserPrompt(initials, growthMetrics, companyData, founderData);
 
-        const completion = await openai.chat.completions.create({
-            model: "o4-mini",
-            temperature: 0.1,
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userPrompt },
-            ],
+        const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${openAIApiKey}`,
+            },
+            body: JSON.stringify({
+                model: 'gpt-4.1', // Using the latest powerful model
+                temperature: 0,
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt },
+                ],
+            }),
         });
 
-        const tgnNote = completion.choices[0].message.content;
+        if (!openAIResponse.ok) {
+            const errorBody = await openAIResponse.json();
+            console.error('OpenAI API Error:', errorBody);
+            throw new Error(errorBody.error?.message || 'Failed to get a response from OpenAI.');
+        }
 
-        res.status(200).json({ tgnNote });
+        const data = await openAIResponse.json();
+        const tgnNote = data.choices[0]?.message?.content;
+
+        if (!tgnNote) {
+            throw new Error('Received an empty response from OpenAI.');
+        }
+
+        // Send the plain text response back to the client
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        return res.status(200).send(tgnNote);
 
     } catch (error) {
-        console.error('Error in /api/generate-tgn:', error);
-        const errorMessage = error.response ? error.response.data.error.message : error.message;
-        res.status(500).json({ error: `Server error during AI generation: ${errorMessage}` });
+        console.error(`Server-side error in /api/generate-tgn: ${error.message}`);
+        return res.status(500).json({ error: `Server error: ${error.message}` });
     }
 };
