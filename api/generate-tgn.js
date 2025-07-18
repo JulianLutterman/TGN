@@ -161,7 +161,7 @@ T 1 Anton Juric COO (Prev. Co-Founder & CEO at Sectragon - Acquired by TCECUR fo
 G 0.5 No financial data, announced first launch in Netherlands with Klarna in Apr-25
 N 1 Raised $5m pre-seed from Creandum Jun-25
 
-For the Team, you should not put every single piece of experience in your notes. You should only put the ones that are most important. In any case, put max. 3 pieces of experience.
+For the Team, you should not put every single piece of experience in your notes. You should only put the ones that are most important. In any case, put max. 3 pieces of experience. Also, don't forget to include the duration of the experiences for each experience you mention.
 
 In these notes, it is very important that you only give dry FACTS, not an interpretation of those facts. Also, always give funding amount and dates in the Network part. For the growth part, you should only add content if there is content in the first place. Sometimes there will not be any info, in which case you give a score of 0 and just type "/"
 
@@ -213,7 +213,7 @@ AI for research and document analysis for legal teams
 
 T 0.25 Raoul Bouchrit CEO (Prev. Project Lead at Port of Rotterdam 1y3m, Senior Consultant at Vasco Consult 1y5m, Consultant at Atos 10m), Nordin Bouchrit CPO (Senior Data Engineer at Valcon 2y5m, CoF at Homey.rent - failed startup 1y10m, Data Scientist at MetrixLab 1y), Andreas Lepidis CTO (Prev. Data Architect at MKB Brandstof 1y9m, Freelance Software Engineer 6y4m)
 G 0.5 Logos: Dutch Ministry of Social Affairs & Employment, Several Law Offices, LI FTE 2x past year
-N 0.5 Raised $2m Seed from Chris Oomen (Optiver founder) Apr-25`;
+N 0.5 Raised $2m Seed from Chris Oomen (Optiver founder) Apr-25d`;
 
         const userPrompt = buildUserPrompt(initials, growthMetrics, companyData, founderData);
 
