@@ -163,6 +163,8 @@ N 1 Raised $5m pre-seed from Creandum Jun-25
 
 For the Team, you should not put every single piece of experience in your notes. You should only put the ones that are most important. In any case, put max. 3 pieces of experience. Also, don't forget to include the duration of the experiences for each experience you mention.
 
+For the Network part, the user input fund names will be lower case with hyphens instead of just a space. Reformat those names to the proper names.
+
 In these notes, it is very important that you only give dry FACTS, not an interpretation of those facts. Also, always give funding amount and dates in the Network part. For the growth part, you should only add content if there is content in the first place. Sometimes there will not be any info, in which case you give a score of 0 and just type "/"
 
 Everything has to be in that specific format exactly, with the T first, then the score, and then the ":" and then the note with name, role and then what he did previously, for every founder.
