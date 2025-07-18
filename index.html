@@ -19,7 +19,7 @@
         }
 
         .container {
-            max-width: 800px;
+            max-width: 1200px; /* Increased width for two columns */
             width: 100%;
             background-color: #ffffff;
             padding: 30px;
@@ -37,18 +37,6 @@
         .input-group {
             margin-bottom: 20px;
         }
-
-        .input-row {
-            display: flex;
-            gap: 20px;
-            align-items: flex-start;
-            flex-wrap: wrap;
-        }
-
-            .input-row > .input-group {
-                flex: 1;
-                min-width: 250px;
-            }
 
         label {
             display: block;
@@ -71,7 +59,106 @@
             resize: vertical;
         }
 
-        button {
+        .company-row {
+            display: flex;
+            gap: 30px;
+            padding: 20px;
+            border: 1px solid #e1e5e8;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            position: relative; /* For the remove button */
+            flex-wrap: wrap;
+        }
+
+        .input-column, .output-column {
+            flex: 1;
+            min-width: 350px;
+        }
+
+        .output-column {
+            border-left: 1px solid #eee;
+            padding-left: 30px;
+        }
+
+        @media (max-width: 800px) {
+            .output-column {
+                border-left: none;
+                padding-left: 0;
+                margin-top: 20px;
+                border-top: 1px solid #eee;
+                padding-top: 20px;
+            }
+        }
+
+        .output-column h2 {
+            margin-top: 0;
+            color: #1a2b4d;
+            font-size: 1.1em;
+        }
+
+        .tgn-result {
+            background-color: #f9f9f9;
+            border: 1px solid #eee;
+            padding: 15px;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 0.95em;
+            min-height: 150px;
+            color: #888;
+        }
+
+        .row-status {
+            margin-top: 10px;
+            font-weight: bold;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .remove-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 5px;
+            line-height: 1;
+            font-weight: bold;
+        }
+
+            .remove-button:hover {
+                color: #d9534f;
+            }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        #addCompanyButton {
+            background-color: #6c757d;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background-color 0.2s;
+            flex-grow: 0;
+            width: auto;
+        }
+
+            #addCompanyButton:hover {
+                background-color: #5a6268;
+            }
+
+        #generateAllButton {
             background-color: #007bff;
             color: white;
             padding: 12px 20px;
@@ -81,18 +168,24 @@
             font-size: 16px;
             font-weight: 600;
             transition: background-color 0.2s;
-            width: 100%;
+            flex-grow: 1;
         }
 
-            button:hover {
+            #generateAllButton:hover {
                 background-color: #0056b3;
             }
 
-        #status {
+            #generateAllButton:disabled {
+                background-color: #0056b3;
+                cursor: not-allowed;
+            }
+
+        #globalStatus {
             margin-top: 20px;
             font-weight: bold;
             padding: 10px;
             border-radius: 4px;
+            text-align: center;
         }
 
         .status-error {
@@ -109,27 +202,6 @@
             color: #31708f;
             background-color: #d9edf7;
         }
-
-        #tgnResultContainer {
-            margin-top: 25px;
-            border-top: 1px solid #eee;
-            padding-top: 20px;
-        }
-
-            #tgnResultContainer h2 {
-                margin-top: 0;
-                color: #1a2b4d;
-            }
-
-        #tgnResult {
-            background-color: #f9f9f9;
-            border: 1px solid #eee;
-            padding: 15px;
-            border-radius: 6px;
-            white-space: pre-wrap; /* Important for preserving formatting */
-            word-wrap: break-word;
-            font-size: 0.95em;
-        }
     </style>
 </head>
 <body>
@@ -142,123 +214,182 @@
             <input type="text" id="userInitials" placeholder="e.g., LS">
         </div>
 
-        <div class="input-row">
-            <div class="input-group">
-                <label for="specterUrl">Specter Company URL</label>
-                <input type="text" id="specterUrl" placeholder="e.g., https://app.tryspecter.com/signals/company/feed/...">
-            </div>
-            <div class="input-group">
-                <label for="growthMetrics">Growth Metrics (Optional)</label>
-                <textarea id="growthMetrics" rows="3" placeholder="e.g., 19% MoM growth, $217k ARR, 27 paying customers..."></textarea>
-            </div>
+        <div id="companiesContainer">
+            <!-- Company rows will be inserted here by JavaScript -->
         </div>
 
-        <button id="generateButton">Generate TGN Note</button>
-        <div id="status"></div>
-
-        <div id="tgnResultContainer" style="display: none;">
-            <h2>Generated TGN Note</h2>
-            <pre id="tgnResult"></pre>
+        <div class="controls">
+            <button id="addCompanyButton">+ Add Another Company</button>
+            <button id="generateAllButton">Generate All TGN Notes</button>
         </div>
+
+        <div id="globalStatus"></div>
     </div>
 
     <script>
-        const generateButton = document.getElementById('generateButton');
-        const specterUrlInput = document.getElementById('specterUrl');
-        const userInitialsInput = document.getElementById('userInitials');
-        const growthMetricsInput = document.getElementById('growthMetrics');
-        const statusDiv = document.getElementById('status');
-        const tgnResultContainer = document.getElementById('tgnResultContainer');
-        const tgnResultEl = document.getElementById('tgnResult');
+        document.addEventListener('DOMContentLoaded', () => {
+            const companiesContainer = document.getElementById('companiesContainer');
+            const addCompanyButton = document.getElementById('addCompanyButton');
+            const generateAllButton = document.getElementById('generateAllButton');
+            const userInitialsInput = document.getElementById('userInitials');
+            const globalStatus = document.getElementById('globalStatus');
+            let companyCounter = 0;
 
-        generateButton.addEventListener('click', async () => {
-            // Reset UI
-            statusDiv.textContent = '';
-            statusDiv.className = '';
-            tgnResultContainer.style.display = 'none';
-            tgnResultEl.textContent = '';
-
-            // 1. Get Inputs
-            const url = specterUrlInput.value.trim();
-            const initials = userInitialsInput.value.trim().toUpperCase();
-            const growthMetrics = growthMetricsInput.value.trim();
-
-            // 2. Validate Inputs
-            if (!initials) {
-                showStatus('Error: Your initials are required.', 'error');
-                return;
-            }
-            if (!url) {
-                showStatus('Error: Specter URL is required.', 'error');
-                return;
-            }
-            const companyId = extractCompanyId(url);
-            if (!companyId) {
-                showStatus('Error: Could not parse Company ID from the URL.', 'error');
-                return;
+            function showGlobalStatus(message, type) {
+                globalStatus.textContent = message;
+                globalStatus.className = `status-${type}`;
             }
 
-            // 3. Start Fetching Process
-            try {
-                // Fetch Company Data
-                showStatus(`Fetching company data for ID: ${companyId}...`, 'loading');
-                const companyResponse = await fetch(`/api/specter?id=${companyId}`);
-                if (!companyResponse.ok) {
-                    const errorData = await companyResponse.json();
-                    throw new Error(`Company Fetch Failed: ${errorData.error || companyResponse.statusText}`);
+            function extractCompanyId(url) {
+                const match = url.match(/\/feed\/([a-f0-9]+)/);
+                return match ? match[1] : null;
+            }
+
+            function addCompanyRow() {
+                companyCounter++;
+                const row = document.createElement('div');
+                row.className = 'company-row';
+                row.dataset.companyId = companyCounter;
+
+                row.innerHTML = `
+                    <div class="input-column">
+                        <div class="input-group">
+                            <label for="specterUrl-${companyCounter}">Specter Company URL</label>
+                            <input type="text" id="specterUrl-${companyCounter}" class="specter-url" placeholder="e.g., https://app.tryspecter.com/signals/company/feed/...">
+                        </div>
+                        <div class="input-group">
+                            <label for="growthMetrics-${companyCounter}">Growth Metrics (Optional)</label>
+                            <textarea id="growthMetrics-${companyCounter}" class="growth-metrics" rows="4" placeholder="e.g., 19% MoM growth, $217k ARR, 27 paying customers..."></textarea>
+                        </div>
+                    </div>
+                    <div class="output-column">
+                        <h2>Generated TGN Note</h2>
+                        <pre class="tgn-result">Awaiting generation...</pre>
+                        <div class="row-status"></div>
+                    </div>
+                    <button class="remove-button" title="Remove Company">×</button>
+                `;
+
+                companiesContainer.appendChild(row);
+
+                row.querySelector('.remove-button').addEventListener('click', () => {
+                    row.remove();
+                });
+            }
+
+            async function processCompanyRow(rowElement, initials) {
+                const urlInput = rowElement.querySelector('.specter-url');
+                const growthMetricsInput = rowElement.querySelector('.growth-metrics');
+                const resultEl = rowElement.querySelector('.tgn-result');
+                const statusEl = rowElement.querySelector('.row-status');
+
+                const showRowStatus = (message, type) => {
+                    statusEl.textContent = message;
+                    statusEl.className = `row-status status-${type}`;
+                };
+
+                try {
+                    showRowStatus('', '');
+                    resultEl.textContent = '';
+                    resultEl.style.color = '#888';
+
+                    const url = urlInput.value.trim();
+                    if (!url) {
+                        showRowStatus('Skipped: URL is required.', 'error');
+                        return;
+                    }
+                    const companyId = extractCompanyId(url);
+                    if (!companyId) {
+                        throw new Error('Could not parse Company ID from the URL.');
+                    }
+                    const growthMetrics = growthMetricsInput.value.trim();
+
+                    showRowStatus(`Fetching data for ID: ${companyId}...`, 'loading');
+
+                    const companyResponse = await fetch(`/api/specter?id=${companyId}`);
+                    if (!companyResponse.ok) {
+                        const errorData = await companyResponse.json();
+                        throw new Error(`Company Fetch Failed: ${errorData.error || companyResponse.statusText}`);
+                    }
+                    const companyData = await companyResponse.json();
+
+                    showRowStatus('Fetching founder data...', 'loading');
+                    const peopleResponse = await fetch(`/api/people?companyId=${companyId}`);
+                    if (!peopleResponse.ok) {
+                        const errorData = await peopleResponse.json();
+                        throw new Error(`Founder Fetch Failed: ${errorData.error || peopleResponse.statusText}`);
+                    }
+                    const founderData = await peopleResponse.json();
+
+                    showRowStatus('Generating TGN Note...', 'loading');
+                    const tgnResponse = await fetch('/api/generate-tgn', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ initials, growthMetrics, companyData, founderData }),
+                    });
+
+                    if (!tgnResponse.ok) {
+                        const errorData = await tgnResponse.json();
+                        throw new Error(`TGN Generation Failed: ${errorData.error || tgnResponse.statusText}`);
+                    }
+                    const tgnNote = await tgnResponse.text();
+
+                    showRowStatus('Success! TGN Note generated.', 'success');
+                    resultEl.textContent = tgnNote;
+                    resultEl.style.color = '#333';
+
+                } catch (error) {
+                    console.error('Error processing row:', rowElement.dataset.companyId, error);
+                    showRowStatus(`Error: ${error.message}`, 'error');
+                    resultEl.textContent = 'Generation failed. See error message above.';
+                    resultEl.style.color = '#d9534f';
                 }
-                const companyData = await companyResponse.json();
+            }
 
-                // Fetch Founder Data
-                showStatus('Fetching founder data...', 'loading');
-                const peopleResponse = await fetch(`/api/people?companyId=${companyId}`);
-                if (!peopleResponse.ok) {
-                    const errorData = await peopleResponse.json();
-                    throw new Error(`Founder Fetch Failed: ${errorData.error || peopleResponse.statusText}`);
+            addCompanyButton.addEventListener('click', addCompanyRow);
+
+            generateAllButton.addEventListener('click', async () => {
+                showGlobalStatus('', '');
+
+                const initials = userInitialsInput.value.trim().toUpperCase();
+                if (!initials) {
+                    showGlobalStatus('Error: Your initials are required to generate notes.', 'error');
+                    return;
                 }
-                const founderData = await peopleResponse.json();
 
-                // Generate TGN Note
-                showStatus('Generating TGN Note... This may take a moment.', 'loading');
-                const tgnResponse = await fetch('/api/generate-tgn', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        initials,
-                        growthMetrics,
-                        companyData,
-                        founderData,
-                    }),
+                const companyRows = document.querySelectorAll('.company-row');
+                if (companyRows.length === 0) {
+                    showGlobalStatus('Please add at least one company to generate a note.', 'error');
+                    return;
+                }
+
+                showGlobalStatus(`Processing ${companyRows.length} companies...`, 'loading');
+                generateAllButton.disabled = true;
+                generateAllButton.textContent = 'Processing...';
+
+                const processingPromises = Array.from(companyRows).map(row => processCompanyRow(row, initials));
+
+                await Promise.all(processingPromises);
+
+                generateAllButton.disabled = false;
+                generateAllButton.textContent = 'Generate All TGN Notes';
+
+                let errorCount = 0;
+                document.querySelectorAll('.row-status').forEach(statusEl => {
+                    if (statusEl.classList.contains('status-error')) {
+                        errorCount++;
+                    }
                 });
 
-                if (!tgnResponse.ok) {
-                    const errorData = await tgnResponse.json();
-                    throw new Error(`TGN Generation Failed: ${errorData.error || tgnResponse.statusText}`);
+                if (errorCount > 0) {
+                    showGlobalStatus(`Processing complete. ${errorCount} of ${companyRows.length} companies failed.`, 'error');
+                } else {
+                    showGlobalStatus(`Success! All ${companyRows.length} notes generated.`, 'success');
                 }
-                const tgnNote = await tgnResponse.text(); // API returns plain text
+            });
 
-                // 4. Display Results
-                showStatus('Success! TGN Note generated.', 'success');
-                tgnResultEl.textContent = tgnNote;
-                tgnResultContainer.style.display = 'block';
-
-            } catch (error) {
-                console.error('Process error:', error);
-                showStatus(`Error: ${error.message}. Check the console for more details.`, 'error');
-            }
+            addCompanyRow();
         });
-
-        function extractCompanyId(url) {
-            const match = url.match(/\/feed\/([a-f0-9]+)/);
-            return match ? match[1] : null;
-        }
-
-        function showStatus(message, type) {
-            statusDiv.textContent = message;
-            statusDiv.className = `status-${type}`;
-        }
     </script>
 
 </body>
