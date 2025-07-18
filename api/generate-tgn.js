@@ -134,7 +134,7 @@ This serves as guidance only and none of them are hard-coded, always use your gu
 **Network:**
 
 - **1:** AAA seed funds and top-tier angels
-    - *Example of Funds at Seed stage*: Point9, Picus, Cherry, Cavalry, Atlantic Labs, Speedinvest, Seedcamp, Btov, Visionaries Club, La Famiglia, 468 Capital, 10x Group, Firstminute
+    - *Example of Funds at Seed stage*: Point9, Picus, Cherry, Cavalry, Atlantic Labs, Speedinvest, Seedcamp, B2venture, Visionaries Club, La Famiglia, 468 Capital, 10x Group, Firstminute
     - *Example of Series A+ Funds* (that also do Seed sometimes): HV Capital, Earlybird, Balderton, Creandum, Northzone, EQT Ventures, Any American fund, Project A, Target Global,
     - *German Tier 1 Angels*: Jens Lapinski (Angelinvest), Philip Moehring (Seedcamp/Angellist), Christophe Maire (Atlantic Labs), Felix Jahn (McMakler, Home24), Felix Haas (IDnow), Lukasz Gadowski (Delivery Hero), Heiko Hubertz (Bigpoint), Johannes Reck (GYourGuide), Valentin Stalf (N26), Maximilian Tayenthal (N26),
     - *French Tier 1 Angels*: Pierre Kosciusko Morizet, Alexis Bonillo, Antoine Martin, Florian Douetteau

@@ -99,17 +99,33 @@
             font-size: 1.1em;
         }
 
+        /* --- MODIFIED: Styles for the output textarea --- */
         .tgn-result {
             background-color: #f9f9f9;
             border: 1px solid #eee;
             padding: 15px;
             border-radius: 6px;
-            white-space: pre-wrap;
-            word-wrap: break-word;
             font-size: 0.95em;
             min-height: 150px;
-            color: #888;
+            color: #888; /* Color for placeholder text */
+            transition: border-color 0.2s, background-color 0.2s;
         }
+
+            /* Style for when it becomes editable */
+            .tgn-result:not([readonly]) {
+                background-color: #ffffff;
+                border-color: #007bff; /* Highlight to show it's active */
+                color: #333;
+                cursor: text;
+            }
+
+                /* Focus style for when user is typing */
+                .tgn-result:not([readonly]):focus {
+                    outline: none;
+                    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+                }
+        /* --- END MODIFICATION --- */
+
 
         .row-status {
             margin-top: 10px;
@@ -254,24 +270,26 @@
                 row.className = 'company-row';
                 row.dataset.companyId = companyCounter;
 
+                // --- MODIFIED: Changed <pre> to <textarea> for the output ---
                 row.innerHTML = `
-                    <div class="input-column">
-                        <div class="input-group">
-                            <label for="specterUrl-${companyCounter}">Specter Company URL</label>
-                            <input type="text" id="specterUrl-${companyCounter}" class="specter-url" placeholder="e.g., https://app.tryspecter.com/signals/company/feed/...">
+                        <div class="input-column">
+                            <div class="input-group">
+                                <label for="specterUrl-${companyCounter}">Specter Company URL</label>
+                                <input type="text" id="specterUrl-${companyCounter}" class="specter-url" placeholder="e.g., https://app.tryspecter.com/signals/company/feed/...">
+                            </div>
+                            <div class="input-group">
+                                <label for="growthMetrics-${companyCounter}">Growth Metrics (Optional)</label>
+                                <textarea id="growthMetrics-${companyCounter}" class="growth-metrics" rows="4" placeholder="e.g., 19% MoM growth, $217k ARR, 27 paying customers..."></textarea>
+                            </div>
                         </div>
-                        <div class="input-group">
-                            <label for="growthMetrics-${companyCounter}">Growth Metrics (Optional)</label>
-                            <textarea id="growthMetrics-${companyCounter}" class="growth-metrics" rows="4" placeholder="e.g., 19% MoM growth, $217k ARR, 27 paying customers..."></textarea>
+                        <div class="output-column">
+                            <h2>Generated TGN Note</h2>
+                            <textarea class="tgn-result" id="tgnResult-${companyCounter}" rows="7" readonly placeholder="Awaiting generation..."></textarea>
+                            <div class="row-status"></div>
                         </div>
-                    </div>
-                    <div class="output-column">
-                        <h2>Generated TGN Note</h2>
-                        <pre class="tgn-result">Awaiting generation...</pre>
-                        <div class="row-status"></div>
-                    </div>
-                    <button class="remove-button" title="Remove Company">X</button>
-                `;
+                        <button class="remove-button" title="Remove Company">X</button>
+                    `;
+                // --- END MODIFICATION ---
 
                 companiesContainer.appendChild(row);
 
@@ -292,9 +310,13 @@
                 };
 
                 try {
+                    // --- MODIFIED: Reset the output textarea for processing ---
                     showRowStatus('', '');
-                    resultEl.textContent = '';
-                    resultEl.style.color = '#888';
+                    resultEl.value = '';
+                    resultEl.placeholder = 'Awaiting generation...';
+                    resultEl.readOnly = true;
+                    resultEl.style.color = ''; // Reset color from potential previous error
+                    // --- END MODIFICATION ---
 
                     const url = urlInput.value.trim();
                     if (!url) {
@@ -337,15 +359,19 @@
                     }
                     const tgnNote = await tgnResponse.text();
 
+                    // --- MODIFIED: Populate textarea and make it editable on success ---
                     showRowStatus('Success! TGN Note generated.', 'success');
-                    resultEl.textContent = tgnNote;
-                    resultEl.style.color = '#333';
+                    resultEl.value = tgnNote;
+                    resultEl.readOnly = false; // Make it editable!
+                    // --- END MODIFICATION ---
 
                 } catch (error) {
                     console.error('Error processing row:', rowElement.dataset.companyId, error);
                     showRowStatus(`Error: ${error.message}`, 'error');
-                    resultEl.textContent = 'Generation failed. See error message above.';
-                    resultEl.style.color = '#d9534f';
+                    // --- MODIFIED: Show error message in the textarea ---
+                    resultEl.value = 'Generation failed. See error message above.';
+                    resultEl.style.color = '#d9534f'; // Use red text for error
+                    // --- END MODIFICATION ---
                 }
             }
 
