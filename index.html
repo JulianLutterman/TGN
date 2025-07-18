@@ -269,16 +269,14 @@
             fetchAndDisplayPeople(data.id);
         }
 
-        // Helper function to pause execution
         const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-        // --- MAJORLY UPDATED FUNCTION ---
         async function fetchAndDisplayPeople(companyId) {
             const peopleInfoEl = document.getElementById('peopleInfo');
             peopleInfoEl.innerHTML = '<p>Loading founders from Specter...</p>';
 
             try {
-                // Step 1: Fetch basic founder info from Specter (this part is working)
+                // Step 1: Fetch basic founder info from Specter
                 const peopleResponse = await fetch(`/api/people?companyId=${companyId}`);
                 const peopleData = await peopleResponse.json();
 
@@ -306,7 +304,6 @@
                 const linkedinUrls = peopleData.map(p => p.linkedin_url).filter(Boolean);
                 if (linkedinUrls.length === 0) return;
 
-                // Update UI to show that the job has started
                 document.querySelectorAll('.linkedin-details-container').forEach(container => {
                     container.innerHTML = `<p style="color:#31708f; font-size:0.9em; margin-top:10px;"><i>Triggering LinkedIn data collection...</i></p>`;
                 });
@@ -318,14 +315,15 @@
                 });
                 const triggerData = await triggerResponse.json();
 
-                if (!triggerResponse.ok || !triggerData.delivery_id) {
+                // --- USING snapshot_id ---
+                if (!triggerResponse.ok || !triggerData.snapshot_id) {
                     throw new Error(triggerData.error || 'Failed to start LinkedIn data collection job.');
                 }
-                const deliveryId = triggerData.delivery_id;
+                const snapshotId = triggerData.snapshot_id;
 
                 // Step 4: Poll for the results from the client-side
                 const maxWaitTime = 300000; // 5 minutes
-                const pollInterval = 8000; // 8 seconds
+                const pollInterval = 10000; // 10 seconds
                 let elapsedTime = 0;
 
                 while (elapsedTime < maxWaitTime) {
@@ -336,11 +334,11 @@
                     await sleep(pollInterval);
                     elapsedTime += pollInterval;
 
-                    const resultsResponse = await fetch(`/api/linkedin-results?delivery_id=${deliveryId}`);
+                    // --- PASSING snapshot_id ---
+                    const resultsResponse = await fetch(`/api/linkedin-results?snapshot_id=${snapshotId}`);
                     const resultsData = await resultsResponse.json();
 
                     if (resultsResponse.status === 200 && resultsData.status === 'complete') {
-                        // SUCCESS! We have the data.
                         const detailedProfiles = resultsData.data;
                         const profileMap = new Map(detailedProfiles.map(p => [p.input_url, p]));
 
@@ -348,23 +346,19 @@
                             const details = profileMap.get(person.linkedin_url);
                             const container = document.querySelector(`#person-${person.id} .linkedin-details-container`);
                             if (details) {
-                                // (Function to render HTML is now separate for clarity)
                                 container.innerHTML = renderProfileDetails(details);
                             } else if (person.linkedin_url) {
                                 container.innerHTML = `<p style="color:#d9534f; font-size:0.9em; margin-top:10px;"><i>Could not retrieve LinkedIn details for this profile.</i></p>`;
                             }
                         });
-                        return; // Exit the loop and function
-                    } else if (resultsResponse.status === 202) {
-                        // Still processing, continue the loop
+                        return; 
+                    } else if (resultsResponse.status === 202 && resultsData.status === 'processing') {
                         console.log('Job still processing, will check again...');
                     } else {
-                        // An error occurred during polling
                         throw new Error(resultsData.error || 'An unknown error occurred while fetching results.');
                     }
                 }
 
-                // If the loop finishes, it means we timed out
                 throw new Error('Request timed out waiting for LinkedIn data.');
 
             } catch (error) {
@@ -375,7 +369,6 @@
 
         function renderProfileDetails(details) {
             let detailsHtml = '<div class="linkedin-details">';
-            // Work Experience
             if (details.experience && details.experience.length > 0) {
                 detailsHtml += '<h4>Work Experience</h4>';
                 details.experience.forEach(exp => {
@@ -387,7 +380,6 @@
                         </div>`;
                 });
             }
-            // Education
             if (details.education && details.education.length > 0) {
                 detailsHtml += '<h4>Education</h4>';
                 details.education.forEach(edu => {

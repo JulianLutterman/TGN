@@ -1,4 +1,4 @@
-// File: /api/linkedin-profiles.js (CORRECTED TRIGGER URL)
+// File: /api/linkedin-profiles.js (Using the CORRECT /datasets/v3/trigger endpoint)
 
 module.exports = async (req, res) => {
     if (req.method !== 'POST') {
@@ -12,7 +12,7 @@ module.exports = async (req, res) => {
     }
 
     const apiKey = process.env.BRIGHTDATA_API_KEY;
-    const datasetId = process.env.BRIGHTDATA_DATASET_ID;
+    const datasetId = process.env.BRIGHTDATA_DATASET_ID; // This is correct for this endpoint
 
     if (!apiKey || !datasetId) {
         console.error("CRITICAL: BrightData environment variables not set.");
@@ -20,8 +20,8 @@ module.exports = async (req, res) => {
     }
 
     try {
-        // --- THIS IS THE CORRECTED URL ---
-        const triggerUrl = `https://api.brightdata.com/dca/trigger?dataset=${datasetId}`;
+        // --- THIS IS THE ENDPOINT FROM YOUR WORKING EXAMPLE ---
+        const triggerUrl = `https://api.brightdata.com/datasets/v3/trigger?dataset_id=${datasetId}&include_errors=true`;
         
         console.log(`[linkedin-profiles] Triggering BrightData job for ${urls.length} URLs at: ${triggerUrl}`);
 
@@ -35,27 +35,23 @@ module.exports = async (req, res) => {
         });
 
         console.log(`[linkedin-profiles] BrightData trigger response status: ${triggerResponse.status}`);
+        const responseData = await triggerResponse.json();
+        console.log(`[linkedin-profiles] BrightData trigger response JSON:`, responseData);
 
         if (!triggerResponse.ok) {
-            const errorText = await triggerResponse.text();
-            console.error(`[linkedin-profiles] BrightData trigger failed. Body: ${errorText}`);
-            throw new Error(`BrightData trigger failed with status ${triggerResponse.status}: ${errorText}`);
+            throw new Error(`BrightData trigger failed: ${JSON.stringify(responseData)}`);
         }
 
-        // The response from this endpoint is a JSON object containing the delivery_id
-        const triggerData = await triggerResponse.json();
-        console.log(`[linkedin-profiles] BrightData trigger response JSON:`, triggerData);
+        const snapshotId = responseData.snapshot_id;
 
-        const deliveryId = triggerData.delivery_id;
-
-        if (!deliveryId) {
-            throw new Error("BrightData response did not contain a delivery_id.");
+        if (!snapshotId) {
+            throw new Error("BrightData response did not contain a snapshot_id.");
         }
 
-        console.log(`[linkedin-profiles] Successfully triggered job. Delivery ID: ${deliveryId}`);
+        console.log(`[linkedin-profiles] Successfully triggered job. Snapshot ID: ${snapshotId}`);
         
-        // Immediately return the delivery_id to the client
-        return res.status(202).json({ delivery_id: deliveryId }); // 202 Accepted
+        // Immediately return the snapshot_id to the client
+        return res.status(202).json({ snapshot_id: snapshotId }); // 202 Accepted
 
     } catch (error) {
         console.error("[linkedin-profiles] Error in trigger function:", error.message);

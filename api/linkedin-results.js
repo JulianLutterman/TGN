@@ -1,22 +1,21 @@
-// File: /api/linkedin-results.js (NEW FILE TO POLL FOR RESULTS)
+// File: /api/linkedin-results.js (Polling the CORRECT snapshot endpoint)
 
 module.exports = async (req, res) => {
-    const { delivery_id } = req.query;
-    if (!delivery_id) {
-        return res.status(400).json({ error: 'A delivery_id is required.' });
+    const { snapshot_id } = req.query;
+    if (!snapshot_id) {
+        return res.status(400).json({ error: 'A snapshot_id is required.' });
     }
 
     const apiKey = process.env.BRIGHTDATA_API_KEY;
-    const datasetId = process.env.BRIGHTDATA_DATASET_ID;
 
-    if (!apiKey || !datasetId) {
-        console.error("CRITICAL: BrightData environment variables not set.");
-        return res.status(500).json({ error: 'BrightData API credentials are not configured on the server.' });
+    if (!apiKey) {
+        console.error("CRITICAL: BRIGHTDATA_API_KEY not set.");
+        return res.status(500).json({ error: 'BrightData API key is not configured.' });
     }
 
     try {
-        const resultsUrl = `https://api.brightdata.com/dca/dataset_delivery?dataset_id=${datasetId}&delivery_id=${delivery_id}`;
-        console.log(`[linkedin-results] Polling for delivery_id: ${delivery_id}`);
+        const resultsUrl = `https://api.brightdata.com/datasets/v3/snapshot/${snapshot_id}?format=json`;
+        console.log(`[linkedin-results] Polling for snapshot_id: ${snapshot_id}`);
 
         const resultsResponse = await fetch(resultsUrl, {
             headers: { 'Authorization': `Bearer ${apiKey}` },
@@ -24,17 +23,17 @@ module.exports = async (req, res) => {
 
         console.log(`[linkedin-results] Poll response status: ${resultsResponse.status}`);
 
-        if (resultsResponse.status === 202) {
-            // 202 means the job is still running. This is expected.
-            return res.status(202).json({ status: 'processing' });
-        }
-
+        // According to docs, this endpoint returns 200 when ready, and might return other statuses while processing.
+        // A common pattern is to get a non-200 status until the data is fully prepared.
         if (resultsResponse.status === 200) {
-            // 200 means the job is done and we have data.
             const results = await resultsResponse.json();
-            console.log(`[linkedin-results] Data received for ${delivery_id}. Processing...`);
+            console.log(`[linkedin-results] Data received for ${snapshot_id}. Processing...`);
 
-            // Process and sanitize the data right here before sending to client
+            if (!results || results.length === 0) {
+                // This can happen if the job is "done" but produced no data. Treat as still processing for a bit.
+                 return res.status(202).json({ status: 'processing' });
+            }
+
             const processedProfiles = results.map(profile => {
                 if (!profile.name) return null;
                 return {
@@ -56,11 +55,10 @@ module.exports = async (req, res) => {
             }).filter(Boolean);
 
             return res.status(200).json({ status: 'complete', data: processedProfiles });
+        } else {
+            // Any other status (like 404 while it's being created) means it's not ready.
+            return res.status(202).json({ status: 'processing' });
         }
-
-        // Any other status is an error.
-        const errorText = await resultsResponse.text();
-        throw new Error(`Polling failed with status ${resultsResponse.status}: ${errorText}`);
 
     } catch (error) {
         console.error(`[linkedin-results] Error polling for results: ${error.message}`);
