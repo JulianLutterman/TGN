@@ -157,12 +157,11 @@ Following that, you will output the total TGN Score, e.g.: TGN 1.25
 Following that, you will put a very brief summary of the company's product, e.g.: AI-driven home design (real estate home configurator & rendering engine), lowering costs and speed while increasing customization ability. "Figma for home design".
 Then, you will output the T, G, and N notes, like this:
 
-T 0.5: CEO (Noah W) took prev. startup to $1M ARR (BlingBerry) and has 10 years of tech sales experience
+T 1 Anton Juric COO (Prev. Co-Founder & CEO at Sectragon - Acquired by TCECUR for $5m 8y2m), Gustav Hammarlund CPO (Prev. VP at Goldman Sachs 8y3m, Trading Application Analyst at Pantor Engineering 2y1m), Niklas Lindgren CEO (Prev. Co-Founder & CMO at Sectragon 8y1m), David Rydberg CTO (Prev. VP at Goldman Sachs 3y1m, Quantitative Analyst at SEB 1y5m)
+G 0.5 No financial data, announced first launch in Netherlands with Klarna in Apr-25
+N 1 Raised $5m pre-seed from Creandum Jun-25
 
-G 0.5: Forecasting $100k+ ARR in next two months
-
-N 1: Steve's friend
-
+In these notes, it is very important that you only give dry FACTS, not an interpretation of those facts. Also, always give funding amount and dates in the Network part. For the growth part, you should only add content if there is content in the first place. Sometimes there will not be any info, in which case you give a score of 0 and just type "/"
 
 Everything has to be in that specific format exactly, with the T first, then the score, and then the ":" and then the note with name, role and then what he did previously, for every founder.
 
@@ -170,46 +169,49 @@ Everything has to be in that specific format exactly, with the T first, then the
 
 ### 3 EXAMPLES
 
-[LS] 31/01/25 TGN 1.25
+[JL] 23/06/25 TGN 1.75
 
-SaaS; CometClips is a trackable interactive personalized video platform which enables organizations to target audiences with mobile marketing, communication and micro-learning video campaigns.
+Short-form AI video creation tool to cheaply and quickly create ads for Reels, TikTok, and YT Shorts.
 
-T 0.25: Gregoy Conellan, founded a RE finance company before started career in banking
-
-G 0: launched in 2009 as consulting service, then went into SaaS, 2024 new poc for new product, seem to have global clients such as Johnson and Johnson, Nivea, Budweiser
-
-N 1: NJM via Mark Gemmill, personal contact
+T 0.75 Patrick Haede CEO (Prev. Co-Founder at Sonic - Consultancy and MVP development for consumer and B2B products 3y1m, Head of Product at Gorillas 1y6m), Magnus Langanke (Prev. Co-founder & Engineering at Sonic 3y2m, Head of Backend at Gorillas 1y5m), Full founding team (10 members) is ex-Sonic.
+G 0 No data availability
+N 1 Raised $5m pre-seed from Creandum Jun-25
 
 
+[JL] 30/06/25 TGN 1.75
+
+GenAI Native CAD software
+
+T 1 Anton Juric COO (Prev. Co-Founder & CEO at Sectragon - Acquired by TCECUR for $5m 8y2m), Gustav Hammarlund CPO (Prev. VP at Goldman Sachs 8y3m, Trading Application Analyst at Pantor Engineering 2y1m), Niklas Lindgren CEO (Prev. Co-Founder & CMO at Sectragon 8y1m), David Rydberg CTO (Prev. VP at Goldman Sachs 3y1m, Quantitative Analyst at SEB 1y5m)
+G 0 /
+N 0.75 Raised $3m Seed from Norrsken May-25
 
 
+[JL] 23/06/25 TGN 1.5
 
-[OA] 08/04/2024 TGN 2
+Real-time consumer lending database for BNPL providers.
 
-SaaS FinOps; Unused SaaS licenses are a $75B problem. Priviom is developing a cost-optimization platform that shows IT + Finance leaders the right costs to cut.
-
-Plan to monetize from both vendors and buyers by proving a comprehensive tech stack analysis for buyers and selling buyer data to vendors.
-
-T 0.5: CEO (Noah W) took prev. startup to $1M ARR (BlingBerry) and has 10 years of tech sales experience
-
-G 0.5: Forecasting $100k+ ARR in next two months
-
-N 1: Steve's friend
+T 0.75 Alex Naughton CEO (Prev. Head of UK, Ireland, Netherlands at Klarna 3y5m), Loic Berthou (Prev. Director of Engineering at Zip Co 1y11m, Engineering Manager Fraud & Risk at Quadpay - acquired by Zip Co 2y4m)
+G 0.5 No financial data, announced first launch in Netherlands with Klarna in Apr-25
+N 0.25 Raised $1.8m pre-seed from Honeycomb Asset Management and Carthona Capital Mar-25
 
 
+[JL] 01/07/25 TGN 2.25
+
+Custom agent builder for customizing customer interactions. UI looks very crisp. Tried trial version and looks extremely user friendly.
+
+T 0.75 Krijn Rijshouwer Founder (Prev. Product Designer at OpenAI 6m, Product Designer Framer 5y9m)
+G 0.5 Web Visits 8x Past 3 Months
+N 1 Raised $3.5m Pre-seed from Sequoia Feb-25
 
 
-[RM] 30/01/25 TGN 1.5
+[JL] 15/07/25 TGN 1.25
 
-Direct inbound to SJS from founder.
+AI for research and document analysis for legal teams
 
-SaaS; AI-driven home design (real estate home configurator & rendering engine), lowering costs and speed while increasing customization ability. "Figma for home design".
-
-T 0.75 Caleb Barclay CEO (Prev. Senior Product Designer at Coinbase 1y1m, Senior Product Designer at Figma 1y, Senior Product Designer at Godaddy 1y3m), Daniel Nguyen (Prev. SWE at Monograph - project management SaaS 5y5m)
-
-G 0.5 $217k ARR (19% MoM growth). 27 paying customers with $8k ACV and $350 CAC. Pipeline is worth $9m ARR.
-
-N 0.25 Raised $1m pre-seed from US angels.`;
+T 0.25 Raoul Bouchrit CEO (Prev. Project Lead at Port of Rotterdam 1y3m, Senior Consultant at Vasco Consult 1y5m, Consultant at Atos 10m), Nordin Bouchrit CPO (Senior Data Engineer at Valcon 2y5m, CoF at Homey.rent - failed startup 1y10m, Data Scientist at MetrixLab 1y), Andreas Lepidis CTO (Prev. Data Architect at MKB Brandstof 1y9m, Freelance Software Engineer 6y4m)
+G 0.5 Logos: Dutch Ministry of Social Affairs & Employment, Several Law Offices, LI FTE 2x past year
+N 0.5 Raised $2m Seed from Chris Oomen (Optiver founder) Apr-25`;
 
         const userPrompt = buildUserPrompt(initials, growthMetrics, companyData, founderData);
 
