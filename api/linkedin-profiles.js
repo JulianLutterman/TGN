@@ -52,7 +52,7 @@ module.exports = async (req, res) => {
 
     // --- 3. Poll for Results ---
     let results = null;
-    const maxWaitTime = 90000; // 90 seconds max wait
+    const maxWaitTime = 400000; // 90 seconds max wait
     const pollInterval = 5000; // 5 seconds
     let elapsedTime = 0;
 
