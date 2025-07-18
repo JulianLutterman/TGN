@@ -271,114 +271,113 @@
 
         // --- MAJORLY UPDATED FUNCTION ---
         async function fetchAndDisplayPeople(companyId) {
-        const peopleInfoEl = document.getElementById('peopleInfo');
-        peopleInfoEl.innerHTML = '<p>Loading founders from Specter...</p>';
+            const peopleInfoEl = document.getElementById('peopleInfo');
+            peopleInfoEl.innerHTML = '<p>Loading founders from Specter...</p>';
 
-        try {
-            // Step 1: Fetch basic founder info from Specter
-            const peopleResponse = await fetch(`/api/people?companyId=${companyId}`);
-            const peopleData = await peopleResponse.json();
+            try {
+                const peopleResponse = await fetch(`/api/people?companyId=${companyId}`);
+                const peopleData = await peopleResponse.json();
 
-            // This check was not robust enough. Let's fix it.
-            if (!peopleResponse.ok) {
-                // If the server returned a non-2xx status, peopleData is the error object.
-                throw new Error(peopleData.error || 'Failed to fetch founders.');
-            }
+                // --- DEBUGGING LINE ---
+                // Let's see exactly what our API is sending back to the browser.
+                console.log("DEBUG [Client]: Raw response from /api/people:", peopleData);
 
-            // --- FIX IS HERE ---
-            // We must explicitly check if the response is an array.
-            if (!Array.isArray(peopleData) || peopleData.length === 0) {
-                // If it's not an array, it might be an error object from the API.
-                // If it's an empty array, there are no founders.
-                const errorMessage = peopleData.error ? `Error: ${peopleData.error}` : 'No founders found for this company.';
-                peopleInfoEl.innerHTML = `<p>${errorMessage}</p>`;
-                return;
-            }
+                if (!peopleResponse.ok) {
+                    throw new Error(peopleData.error || 'Failed to fetch founders.');
+                }
 
-            // Step 2: Prepare to render basic info while waiting for LinkedIn data
-            let initialHtml = '<ul class="data-list">';
-            peopleData.forEach(person => { // This line will now work correctly
-                initialHtml += `
-                    <li id="person-${person.id}">
-                        <strong>${person.full_name || 'N/A'}</strong><br>
-                        <small>Title: ${person.current_position_title || 'N/A'}</small><br>
-                        ${person.linkedin_url ? `<a href="${person.linkedin_url}" target="_blank">LinkedIn Profile</a>` : '<span>No LinkedIn Profile</span>'}
-                        <div class="linkedin-details-container"></div>
-                    </li>`;
-            });
-            initialHtml += '</ul>';
-            peopleInfoEl.innerHTML = initialHtml;
+                if (!Array.isArray(peopleData) || peopleData.length === 0) {
+                    const errorMessage = peopleData.error ? `Error from API: ${peopleData.error}` : 'No founders found for this company.';
+                    peopleInfoEl.innerHTML = `<p>${errorMessage}</p>`;
+                    // --- DEBUGGING LINE ---
+                    console.error("DEBUG [Client]: Halting execution because peopleData is not a valid array.", peopleData);
+                    return;
+                }
 
-            // Step 3: Fetch detailed LinkedIn profiles from our new endpoint
-            const linkedinUrls = peopleData.map(p => p.linkedin_url).filter(Boolean);
-            if (linkedinUrls.length === 0) {
-                return; // No LinkedIn URLs to fetch
-            }
+                // Step 2: Prepare to render basic info while waiting for LinkedIn data
+                let initialHtml = '<ul class="data-list">';
+                peopleData.forEach(person => { // This line will now work correctly
+                    initialHtml += `
+                        <li id="person-${person.id}">
+                            <strong>${person.full_name || 'N/A'}</strong><br>
+                            <small>Title: ${person.current_position_title || 'N/A'}</small><br>
+                            ${person.linkedin_url ? `<a href="${person.linkedin_url}" target="_blank">LinkedIn Profile</a>` : '<span>No LinkedIn Profile</span>'}
+                            <div class="linkedin-details-container"></div>
+                        </li>`;
+                });
+                initialHtml += '</ul>';
+                peopleInfoEl.innerHTML = initialHtml;
 
-            // Update status for the user
-            peopleData.forEach(person => {
-                if (person.linkedin_url) {
+                // Step 3: Fetch detailed LinkedIn profiles from our new endpoint
+                const linkedinUrls = peopleData.map(p => p.linkedin_url).filter(Boolean);
+                if (linkedinUrls.length === 0) {
+                    return; // No LinkedIn URLs to fetch
+                }
+
+                // Update status for the user
+                peopleData.forEach(person => {
+                    if (person.linkedin_url) {
+                        const container = document.querySelector(`#person-${person.id} .linkedin-details-container`);
+                        container.innerHTML = `<p style="color:#31708f; font-size:0.9em; margin-top:10px;"><i>Fetching LinkedIn details...</i></p>`;
+                    }
+                });
+
+                const linkedinResponse = await fetch('/api/linkedin-profiles', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ urls: linkedinUrls }),
+                });
+                const detailedProfiles = await linkedinResponse.json();
+
+                if (!linkedinResponse.ok) throw new Error(detailedProfiles.error || 'Failed to fetch LinkedIn profiles.');
+
+                // Step 4: Create a map for easy lookup and render the detailed info
+                const profileMap = new Map(detailedProfiles.map(p => [p.input_url, p]));
+
+                peopleData.forEach(person => {
+                    const details = profileMap.get(person.linkedin_url);
                     const container = document.querySelector(`#person-${person.id} .linkedin-details-container`);
-                    container.innerHTML = `<p style="color:#31708f; font-size:0.9em; margin-top:10px;"><i>Fetching LinkedIn details...</i></p>`;
-                }
-            });
 
-            const linkedinResponse = await fetch('/api/linkedin-profiles', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ urls: linkedinUrls }),
-            });
-            const detailedProfiles = await linkedinResponse.json();
+                    if (details) {
+                        let detailsHtml = '<div class="linkedin-details">';
 
-            if (!linkedinResponse.ok) throw new Error(detailedProfiles.error || 'Failed to fetch LinkedIn profiles.');
+                        // Work Experience
+                        if (details.experience && details.experience.length > 0) {
+                            detailsHtml += '<h4>Work Experience</h4>';
+                            details.experience.forEach(exp => {
+                                detailsHtml += `
+                                    <div class="detail-block">
+                                        <p><strong>${exp.job_title}</strong> at ${exp.company}</p>
+                                        <p><small>${exp.duration}</small></p>
+                                        <p class="description">${exp.description}</p>
+                                    </div>`;
+                            });
+                        }
 
-            // Step 4: Create a map for easy lookup and render the detailed info
-            const profileMap = new Map(detailedProfiles.map(p => [p.input_url, p]));
+                        // Education
+                        if (details.education && details.education.length > 0) {
+                            detailsHtml += '<h4>Education</h4>';
+                            details.education.forEach(edu => {
+                                detailsHtml += `
+                                    <div class="detail-block">
+                                        <p><strong>${edu.degree}</strong>, ${edu.field}</p>
+                                        <p><small>${edu.school}</small></p>
+                                    </div>`;
+                            });
+                        }
 
-            peopleData.forEach(person => {
-                const details = profileMap.get(person.linkedin_url);
-                const container = document.querySelector(`#person-${person.id} .linkedin-details-container`);
-
-                if (details) {
-                    let detailsHtml = '<div class="linkedin-details">';
-
-                    // Work Experience
-                    if (details.experience && details.experience.length > 0) {
-                        detailsHtml += '<h4>Work Experience</h4>';
-                        details.experience.forEach(exp => {
-                            detailsHtml += `
-                                <div class="detail-block">
-                                    <p><strong>${exp.job_title}</strong> at ${exp.company}</p>
-                                    <p><small>${exp.duration}</small></p>
-                                    <p class="description">${exp.description}</p>
-                                </div>`;
-                        });
+                        detailsHtml += '</div>';
+                        container.innerHTML = detailsHtml;
+                    } else if (person.linkedin_url) {
+                        container.innerHTML = `<p style="color:#d9534f; font-size:0.9em; margin-top:10px;"><i>Could not retrieve LinkedIn details.</i></p>`;
                     }
+                });
 
-                    // Education
-                    if (details.education && details.education.length > 0) {
-                        detailsHtml += '<h4>Education</h4>';
-                        details.education.forEach(edu => {
-                            detailsHtml += `
-                                <div class="detail-block">
-                                    <p><strong>${edu.degree}</strong>, ${edu.field}</p>
-                                    <p><small>${edu.school}</small></p>
-                                </div>`;
-                        });
-                    }
-
-                    detailsHtml += '</div>';
-                    container.innerHTML = detailsHtml;
-                } else if (person.linkedin_url) {
-                    container.innerHTML = `<p style="color:#d9534f; font-size:0.9em; margin-top:10px;"><i>Could not retrieve LinkedIn details.</i></p>`;
-                }
-            });
-
-        } catch (error) {
-            console.error('Error fetching/displaying people:', error);
-            peopleInfoEl.innerHTML = `<p style="color: #d9534f;">Could not load founders: ${error.message}</p>`;
+            } catch (error) {
+                console.error('Error fetching/displaying people:', error);
+                peopleInfoEl.innerHTML = `<p style="color: #d9534f;">Could not load founders: ${error.message}</p>`;
+            }
         }
-    }
     </script>
 
 </body>

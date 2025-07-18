@@ -1,89 +1,77 @@
 // File: /api/people.js
 
+// File: /api/people.js (DEBUG VERSION)
+
 module.exports = async (req, res) => {
   const { companyId } = req.query;
 
+  console.log(`DEBUG [Server /api/people]: Function invoked for companyId: ${companyId}`);
+
   if (!companyId) {
+    console.error("DEBUG [Server /api/people]: Failed because companyId is missing.");
     return res.status(400).json({ error: 'Company ID is required' });
   }
 
-  // --- API Key Configuration ---
-  const specterApiKey = process.env.SPECTER_API_KEY;
-  const brightdataApiKey = process.env.BRIGHTDATA_API_KEY;
-  const brightdataDatasetId = process.env.BRIGHTDATA_DATASET_ID;
+  const apiKey = process.env.SPECTER_API_KEY;
 
-  if (!specterApiKey) {
-    return res.status(500).json({ error: 'Specter API key is not configured on the server.' });
-  }
-  if (!brightdataApiKey || !brightdataDatasetId) {
-    return res.status(500).json({ error: 'Bright Data API key or Dataset ID is not configured.' });
+  if (!apiKey) {
+    console.error("CRITICAL: SPECTER_API_KEY environment variable not found on the server!");
+    return res.status(500).json({ error: 'API key is not configured on the server.' });
   }
 
   try {
-    // --- STEP 1: Get Founders from Specter ---
+    // STEP 1: Get the list of person IDs for the company
     const peopleListUrl = `https://app.tryspecter.com/api/v1/companies/${companyId}/people?founders=true`;
+    console.log(`DEBUG [Server /api/people]: Fetching from Specter URL: ${peopleListUrl}`);
+
     const peopleListResponse = await fetch(peopleListUrl, {
-      headers: { 'X-API-Key': specterApiKey },
+      headers: { 'X-API-Key': apiKey },
     });
+
+    console.log(`DEBUG [Server /api/people]: Received status ${peopleListResponse.status} from Specter.`);
+
+    // We need to see the raw text in case it's not JSON
+    const responseText = await peopleListResponse.text();
+    console.log(`DEBUG [Server /api/people]: Raw response text from Specter: ${responseText}`);
 
     if (!peopleListResponse.ok) {
-      throw new Error(`Specter People List API failed: ${peopleListResponse.statusText}`);
-    }
-    const peopleList = await peopleListResponse.json();
-
-    if (!peopleList || peopleList.length === 0) {
-      return res.status(200).json({ specterData: [], brightDataJob: null });
-    }
-
-    // --- STEP 2: Get Detailed Profiles from Specter ---
-    const personDetailPromises = peopleList.map(person => {
-      const personDetailUrl = `https://app.tryspecter.com/api/v1/people/${person.person_id}`;
-      return fetch(personDetailUrl, { headers: { 'X-API-Key': specterApiKey } })
-        .then(response => response.ok ? response.json() : null);
-    });
-    const successfulPeopleDetails = (await Promise.all(personDetailPromises)).filter(p => p !== null);
-
-    // --- STEP 3: Trigger Bright Data LinkedIn Fetch ---
-    const linkedInUrls = successfulPeopleDetails
-      .map(person => person.linkedin_url)
-      .filter(Boolean); // Filter out any null/undefined URLs
-
-    let brightDataResponse = null;
-    if (linkedInUrls.length > 0) {
-      const brightDataPayload = linkedInUrls.map(url => ({ url }));
-
-      const brightDataTriggerResponse = await fetch(`https://api.brightdata.com/datasets/v3/trigger?dataset_id=${brightdataDatasetId}&include_errors=true`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${brightdataApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(brightDataPayload),
-      });
-
-      if (!brightDataTriggerResponse.ok) {
-        const errorText = await brightDataTriggerResponse.text();
-        console.error("Bright Data API Error:", errorText);
-        // Don't fail the whole request, just note the error
-        brightDataResponse = { status: 'error', message: 'Failed to trigger Bright Data job.' };
-      } else {
-        const triggerResult = await brightDataTriggerResponse.json();
-        brightDataResponse = {
-          status: 'triggered',
-          delivery_id: triggerResult.delivery_id,
-          message: `Successfully triggered LinkedIn data fetch for ${linkedInUrls.length} founder(s). Delivery ID: ${triggerResult.delivery_id}. Data will be available in your Bright Data dataset shortly.`
-        };
+      console.error(`DEBUG [Server /api/people]: Specter API returned an error. Body: ${responseText}`);
+      // Try to parse as JSON, but fallback to text if it fails
+      try {
+        return res.status(peopleListResponse.status).json(JSON.parse(responseText));
+      } catch (e) {
+        return res.status(peopleListResponse.status).json({ error: responseText });
       }
     }
 
-    // --- STEP 4: Return Combined Data ---
-    return res.status(200).json({
-      specterData: successfulPeopleDetails,
-      brightDataJob: brightDataResponse
+    const peopleList = JSON.parse(responseText);
+    console.log(`DEBUG [Server /api/people]: Parsed founder list from Specter:`, peopleList);
+
+    if (!peopleList || peopleList.length === 0) {
+      console.log("DEBUG [Server /api/people]: No founders found in Specter's response. Returning empty array.");
+      return res.status(200).json([]); // No people found, return empty array
+    }
+
+    // --- TEMPORARY SIMPLIFICATION ---
+    // For debugging, we will SKIP the detailed profile fetch and return the initial list directly.
+    // This helps us confirm if the first API call is working correctly.
+    // The objects in this list have `person_id`, `full_name`, `title`, etc.
+    // This is NOT the final data structure, but it's enough to debug.
+    console.log("DEBUG [Server /api/people]: SIMPLIFICATION: Returning the initial list without fetching details.");
+    return res.status(200).json(peopleList);
+
+    /*
+    // --- The original detailed fetch logic is commented out for now ---
+    const personDetailPromises = peopleList.map(person => {
+      // ... logic to fetch each person's details ...
     });
+    const detailedPeople = await Promise.all(personDetailPromises);
+    const successfulPeopleDetails = detailedPeople.filter(p => p !== null);
+    return res.status(200).json(successfulPeopleDetails);
+    */
 
   } catch (error) {
-    console.error(`Server-side orchestration for people failed: ${error.message}`);
+    console.error(`DEBUG [Server /api/people]: A critical error occurred in the try-catch block: ${error.message}`);
     return res.status(500).json({ error: `Server error: ${error.message}` });
   }
 };
