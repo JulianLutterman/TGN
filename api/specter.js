@@ -24,25 +24,18 @@ module.exports = async (req, res) => {
       },
     });
 
-    // Check if the response from Specter is JSON before trying to parse it.
     const contentType = specterResponse.headers.get("content-type");
     if (contentType && contentType.indexOf("application/json") !== -1) {
-      // It's JSON, proceed as normal.
       const data = await specterResponse.json();
       if (!specterResponse.ok) {
-        // The JSON contains an error message from Specter
         console.error("Specter API returned a JSON error:", data);
         return res.status(specterResponse.status).json(data);
       }
       return res.status(200).json(data);
     } else {
-      // It's NOT JSON. It's probably the HTML error page.
-      // Let's log it to find out what it is.
       const responseText = await specterResponse.text();
       console.error("CRITICAL: Specter API did not return JSON. It returned this text/HTML instead:");
-      console.error(responseText); // This will show the HTML in your Vercel logs!
-      
-      // Send a generic error to the frontend.
+      console.error(responseText);
       return res.status(502).json({ error: 'Bad Gateway: Received an invalid response from the Specter API.' });
     }
 

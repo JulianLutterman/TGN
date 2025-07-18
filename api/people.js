@@ -1,76 +1,64 @@
-// File: /api/people.js (Restored to full functionality with detailed logging)
+// File: /api/people.js
 
 module.exports = async (req, res) => {
   const { companyId } = req.query;
-  console.log(`DEBUG [Server /api/people]: Function invoked for companyId: ${companyId}`);
 
   if (!companyId) {
     return res.status(400).json({ error: 'Company ID is required' });
   }
 
   const apiKey = process.env.SPECTER_API_KEY;
+
   if (!apiKey) {
-    console.error("CRITICAL: SPECTER_API_KEY environment variable not found!");
+    console.error("CRITICAL: SPECTER_API_KEY environment variable not found on the server!");
     return res.status(500).json({ error: 'API key is not configured on the server.' });
   }
 
   try {
-    // STEP 1: Get the list of founder IDs
+    // STEP 1: Get the list of founder IDs for the company using the `founders=true` filter.
     const peopleListUrl = `https://app.tryspecter.com/api/v1/companies/${companyId}/people?founders=true`;
-    console.log(`DEBUG [Server /api/people]: Fetching founder list from: ${peopleListUrl}`);
+    
     const peopleListResponse = await fetch(peopleListUrl, {
       headers: { 'X-API-Key': apiKey },
     });
 
     if (!peopleListResponse.ok) {
-      const errorText = await peopleListResponse.text();
-      console.error(`DEBUG [Server /api/people]: Specter founder list API returned an error. Status: ${peopleListResponse.status}, Body: ${errorText}`);
-      return res.status(peopleListResponse.status).json({ error: `Failed to get founder list: ${errorText}` });
+      const errorData = await peopleListResponse.json();
+      console.error("Specter People List API returned an error:", errorData);
+      return res.status(peopleListResponse.status).json(errorData);
     }
 
-    const peopleList = await peopleListResponse.json();
-    console.log(`DEBUG [Server /api/people]: Got founder list:`, peopleList);
+    const founderList = await peopleListResponse.json();
 
-    if (!peopleList || peopleList.length === 0) {
-      console.log("DEBUG [Server /api/people]: No founders found. Returning empty array.");
-      return res.status(200).json([]);
+    if (!founderList || founderList.length === 0) {
+      // No founders found for this company.
+      return res.status(200).json([]); 
     }
 
-    // STEP 2: For each founder, fetch their detailed profile in parallel
-    console.log(`DEBUG [Server /api/people]: Now fetching detailed profiles for ${peopleList.length} founders.`);
-    
-    const personDetailPromises = peopleList.map(person => {
+    // STEP 2: For each founder, fetch their detailed profile in parallel.
+    // This is where we get the rich LinkedIn data.
+    const personDetailPromises = founderList.map(person => {
       const personDetailUrl = `https://app.tryspecter.com/api/v1/people/${person.person_id}`;
-      console.log(`DEBUG [Server /api/people]:   - Preparing to fetch from ${personDetailUrl}`);
-      
       return fetch(personDetailUrl, {
         headers: { 'X-API-Key': apiKey },
-      }).then(async response => {
-        if (!response.ok) {
-          console.error(`DEBUG [Server /api/people]:   - FAILED to fetch details for ${person.person_id}. Status: ${response.status}`);
-          return null; // Return null for failed requests
-        }
-        const detailedPerson = await response.json();
-        console.log(`DEBUG [Server /api/people]:   - SUCCESS fetching details for ${person.person_id}. Name: ${detailedPerson.full_name}`);
-        return detailedPerson;
-      }).catch(error => {
-          console.error(`DEBUG [Server /api/people]:   - CRITICAL ERROR fetching details for ${person.person_id}: ${error.message}`);
-          return null; // Also return null on network errors
+      }).then(response => {
+        // If a single person fetch fails, return null so Promise.all doesn't fail.
+        if (!response.ok) return null;
+        return response.json();
       });
     });
 
-    // Wait for all the detailed profile fetches to complete
+    // Wait for all the detailed profile fetches to complete.
     const detailedPeople = await Promise.all(personDetailPromises);
 
-    // Filter out any null results from failed individual fetches
+    // Filter out any null results from failed individual fetches.
     const successfulPeopleDetails = detailedPeople.filter(p => p !== null);
-    console.log(`DEBUG [Server /api/people]: Successfully fetched ${successfulPeopleDetails.length} detailed profiles. Sending to client.`);
-    
-    // This now returns the full objects with `id` and `linkedin_url`
+
+    // Return the array of detailed founder profiles.
     return res.status(200).json(successfulPeopleDetails);
 
   } catch (error) {
-    console.error(`DEBUG [Server /api/people]: A critical error occurred in the main try-catch block: ${error.message}`);
+    console.error(`Server-side orchestration for people failed: ${error.message}`);
     return res.status(500).json({ error: `Server error: ${error.message}` });
   }
 };
