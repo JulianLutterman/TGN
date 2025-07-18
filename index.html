@@ -269,6 +269,7 @@
             fetchAndDisplayPeople(data.id);
         }
 
+        // Helper function to pause execution
         const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
         async function fetchAndDisplayPeople(companyId) {
@@ -304,6 +305,9 @@
                 const linkedinUrls = peopleData.map(p => p.linkedin_url).filter(Boolean);
                 if (linkedinUrls.length === 0) return;
 
+                // --- NEW: Create a set of URLs we are waiting for ---
+                const waitingForUrls = new Set(linkedinUrls);
+
                 document.querySelectorAll('.linkedin-details-container').forEach(container => {
                     container.innerHTML = `<p style="color:#31708f; font-size:0.9em; margin-top:10px;"><i>Triggering LinkedIn data collection...</i></p>`;
                 });
@@ -315,51 +319,56 @@
                 });
                 const triggerData = await triggerResponse.json();
 
-                // --- USING snapshot_id ---
                 if (!triggerResponse.ok || !triggerData.snapshot_id) {
                     throw new Error(triggerData.error || 'Failed to start LinkedIn data collection job.');
                 }
                 const snapshotId = triggerData.snapshot_id;
 
-                // Step 4: Poll for the results from the client-side
+                // Step 4: Smart Polling Loop
                 const maxWaitTime = 300000; // 5 minutes
                 const pollInterval = 10000; // 10 seconds
                 let elapsedTime = 0;
 
-                while (elapsedTime < maxWaitTime) {
-                    document.querySelectorAll('.linkedin-details-container').forEach(container => {
-                        container.innerHTML = `<p style="color:#31708f; font-size:0.9em; margin-top:10px;"><i>Collection in progress... (checking again in ${pollInterval/1000}s)</i></p>`;
+                // --- NEW: Loop until the waiting list is empty ---
+                while (waitingForUrls.size > 0 && elapsedTime < maxWaitTime) {
+                    // Update status message for only those still pending
+                    waitingForUrls.forEach(url => {
+                        const person = peopleData.find(p => p.linkedin_url === url);
+                        if (person) {
+                            const container = document.querySelector(`#person-${person.id} .linkedin-details-container`);
+                            container.innerHTML = `<p style="color:#31708f; font-size:0.9em; margin-top:10px;"><i>Collection in progress... (checking again in ${pollInterval/1000}s)</i></p>`;
+                        }
                     });
 
                     await sleep(pollInterval);
                     elapsedTime += pollInterval;
 
-                    // --- PASSING snapshot_id ---
                     const resultsResponse = await fetch(`/api/linkedin-results?snapshot_id=${snapshotId}`);
-                    const resultsData = await resultsResponse.json();
+                    const availableProfiles = await resultsResponse.json();
 
-                    if (resultsResponse.status === 200 && resultsData.status === 'complete') {
-                        const detailedProfiles = resultsData.data;
-                        const profileMap = new Map(detailedProfiles.map(p => [p.input_url, p]));
-
-                        peopleData.forEach(person => {
-                            const details = profileMap.get(person.linkedin_url);
-                            const container = document.querySelector(`#person-${person.id} .linkedin-details-container`);
-                            if (details) {
-                                container.innerHTML = renderProfileDetails(details);
-                            } else if (person.linkedin_url) {
-                                container.innerHTML = `<p style="color:#d9534f; font-size:0.9em; margin-top:10px;"><i>Could not retrieve LinkedIn details for this profile.</i></p>`;
+                    // --- NEW: Process profiles as they arrive ---
+                    if (Array.isArray(availableProfiles) && availableProfiles.length > 0) {
+                        availableProfiles.forEach(profile => {
+                            const url = profile.input_url;
+                            // If this is a profile we were waiting for
+                            if (waitingForUrls.has(url)) {
+                                const person = peopleData.find(p => p.linkedin_url === url);
+                                if (person) {
+                                    const container = document.querySelector(`#person-${person.id} .linkedin-details-container`);
+                                    // Render the details using the corrected mapping
+                                    container.innerHTML = renderProfileDetails(profile);
+                                    // Remove from the waiting list
+                                    waitingForUrls.delete(url);
+                                }
                             }
                         });
-                        return; 
-                    } else if (resultsResponse.status === 202 && resultsData.status === 'processing') {
-                        console.log('Job still processing, will check again...');
-                    } else {
-                        throw new Error(resultsData.error || 'An unknown error occurred while fetching results.');
                     }
-                }
+                } // End of while loop
 
-                throw new Error('Request timed out waiting for LinkedIn data.');
+                if (waitingForUrls.size > 0) {
+                    // If the loop finished but we're still waiting for some, they timed out.
+                    throw new Error('Request timed out waiting for some LinkedIn profiles.');
+                }
 
             } catch (error) {
                 console.error('Error fetching/displaying people:', error);
@@ -367,26 +376,34 @@
             }
         }
 
+        // --- CORRECTED DATA MAPPING ---
         function renderProfileDetails(details) {
             let detailsHtml = '<div class="linkedin-details">';
+        
+            // Use the 'experience' field from the raw JSON
             if (details.experience && details.experience.length > 0) {
                 detailsHtml += '<h4>Work Experience</h4>';
                 details.experience.forEach(exp => {
                     detailsHtml += `
                         <div class="detail-block">
-                            <p><strong>${exp.job_title}</strong> at ${exp.company}</p>
-                            <p><small>${exp.duration}</small></p>
-                            <p class="description">${exp.description}</p>
+                            <p><strong>${exp.title || 'N/A'}</strong> at ${exp.subtitle || 'N/A'}</p>
+                            <p><small>${exp.duration || 'N/A'}</small></p>
+                            <p class="description">${exp.description || 'No description provided.'}</p>
                         </div>`;
                 });
             }
+
+            // Use the 'education' field from the raw JSON
             if (details.education && details.education.length > 0) {
                 detailsHtml += '<h4>Education</h4>';
                 details.education.forEach(edu => {
+                    // Correctly map the fields that actually exist in the JSON
+                    const school = edu.title || 'N/A';
+                    const years = (edu.start_year && edu.end_year) ? `${edu.start_year} - ${edu.end_year}` : 'Dates N/A';
                     detailsHtml += `
                         <div class="detail-block">
-                            <p><strong>${edu.degree}</strong>, ${edu.field}</p>
-                            <p><small>${edu.school}</small></p>
+                            <p><strong>${school}</strong></p>
+                            <p><small>${years}</small></p>
                         </div>`;
                 });
             }
