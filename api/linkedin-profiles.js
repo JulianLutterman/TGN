@@ -15,7 +15,7 @@ module.exports = async (req, res) => {
     }
 
     const apiKey = process.env.BRIGHTDATA_API_KEY;
-    const datasetId = process.env.BRIGHTDAT_DATASET_ID; // Use a specific env var for the people dataset
+    const datasetId = process.env.BRIGHTDATA_DATASET_ID; // Use a specific env var for the people dataset
 
     if (!apiKey || !datasetId) {
         console.error("CRITICAL: BrightData environment variables not set.");
