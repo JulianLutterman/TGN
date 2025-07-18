@@ -34,19 +34,6 @@
             margin-top: 0;
         }
 
-        h3 {
-            margin: 0 0 10px 0;
-            color: #1a2b4d;
-        }
-
-        h4 {
-            margin: 15px 0 5px 0;
-            color: #333;
-            font-size: 1.1em;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 5px;
-        }
-
         .input-group {
             margin-bottom: 20px;
         }
@@ -114,6 +101,11 @@
             margin-bottom: 20px;
         }
 
+            .result-item h3 {
+                margin: 0 0 10px 0;
+                color: #1a2b4d;
+            }
+
             .result-item p, .result-item a {
                 margin: 0;
                 word-break: break-all;
@@ -128,29 +120,42 @@
                 background-color: #f9f9f9;
                 border: 1px solid #eee;
                 padding: 15px;
-                margin-bottom: 10px;
+                margin-bottom: 15px;
                 border-radius: 4px;
             }
 
                 .data-list li small {
                     color: #555;
                 }
-
-        .experience-item, .education-item {
-            margin-left: 20px;
-            padding-left: 15px;
-            border-left: 2px solid #007bff;
-            margin-bottom: 15px;
+        /* --- NEW STYLES FOR LINKEDIN DETAILS --- */
+        .linkedin-details {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px dashed #ddd;
         }
 
-            .experience-item p, .education-item p {
-                margin: 2px 0;
+            .linkedin-details h4 {
+                margin: 10px 0 5px 0;
+                color: #333;
+                font-size: 1em;
             }
 
-            .experience-item .job-description {
+        .detail-block {
+            padding-left: 15px;
+            border-left: 2px solid #007bff;
+            margin-bottom: 10px;
+        }
+
+            .detail-block p {
+                margin: 2px 0;
                 font-size: 0.9em;
+            }
+
+            .detail-block .description {
                 color: #666;
-                margin-top: 5px;
+                font-style: italic;
+                font-size: 0.85em;
+                white-space: pre-wrap; /* Preserve line breaks in description */
             }
     </style>
 </head>
@@ -189,81 +194,6 @@
     </div>
 
     <script>
-        // --- NO CHANGES NEEDED ABOVE THIS LINE ---
-
-        async function fetchAndDisplayPeople(companyId) {
-            const peopleInfoEl = document.getElementById('peopleInfo');
-            peopleInfoEl.innerHTML = '<p>Loading founders and enriching with LinkedIn data...</p>';
-
-            try {
-                const response = await fetch(`/api/people?companyId=${companyId}`);
-                const peopleData = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(peopleData.error || 'Failed to fetch people data.');
-                }
-
-                if (peopleData && peopleData.length > 0) {
-                    let peopleHtml = '<ul class="data-list">';
-                    peopleData.forEach(person => {
-                        const linkedInLink = person.linkedin_url
-                            ? `<a href="${person.linkedin_url}" target="_blank">LinkedIn Profile</a>`
-                            : '<span>No LinkedIn Profile</span>';
-
-                        // Check for enriched data from Bright Data
-                        const linkedInData = person.linkedin_data;
-
-                        let experienceHtml = '<h4>Work Experience</h4>';
-                        if (linkedInData && linkedInData.experience && linkedInData.experience.length > 0) {
-                            linkedInData.experience.forEach(exp => {
-                                experienceHtml += `
-                                    <div class="experience-item">
-                                        <p><strong>${exp.title || 'N/A'}</strong> at ${exp.subtitle || 'N/A'}</p>
-                                        <p><small>${exp.start_date || ''} - ${exp.end_date || 'Present'} (${exp.duration || ''})</small></p>
-                                        ${exp.description ? `<p class="job-description">${exp.description}</p>` : ''}
-                                    </div>
-                                `;
-                            });
-                        } else {
-                            experienceHtml += '<p>No work experience data available.</p>';
-                        }
-
-                        let educationHtml = '<h4>Education</h4>';
-                        if (linkedInData && linkedInData.education && linkedInData.education.length > 0) {
-                            linkedInData.education.forEach(edu => {
-                                educationHtml += `
-                                    <div class="education-item">
-                                        <p><strong>${edu.degree || 'N/A'}</strong></p>
-                                        <p><small>${edu.title || 'N/A'}</small></p>
-                                    </div>
-                                `;
-                            });
-                        } else {
-                            educationHtml += '<p>No education data available.</p>';
-                        }
-
-                        peopleHtml += `
-                            <li>
-                                <strong>${person.full_name || 'N/A'}</strong><br>
-                                <small>Title: ${person.current_position_title || 'N/A'}</small><br>
-                                ${linkedInLink}
-                                ${linkedInData ? experienceHtml + educationHtml : '<p><small>Could not retrieve detailed LinkedIn data.</small></p>'}
-                            </li>
-                        `;
-                    });
-                    peopleHtml += '</ul>';
-                    peopleInfoEl.innerHTML = peopleHtml;
-                } else {
-                    peopleInfoEl.innerHTML = '<p>No founder information available for this company.</p>';
-                }
-            } catch (error) {
-                console.error('Error fetching people:', error);
-                peopleInfoEl.innerHTML = `<p style="color: #d9534f;">Could not load people: ${error.message}</p>`;
-            }
-        }
-
-        // --- NO CHANGES NEEDED BELOW THIS LINE ---
-
         const fetchButton = document.getElementById('fetchButton');
         const specterUrlInput = document.getElementById('specterUrl');
         const statusDiv = document.getElementById('status');
@@ -304,12 +234,8 @@
         });
 
         function extractCompanyId(url) {
-            try {
-                const match = url.match(/\/feed\/([a-f0-9]+)/);
-                return match ? match[1] : null;
-            } catch (e) {
-                return null;
-            }
+            const match = url.match(/\/feed\/([a-f0-9]+)/);
+            return match ? match[1] : null;
         }
 
         function showStatus(message, type) {
@@ -324,7 +250,6 @@
 
             const fundingInfoEl = document.getElementById('fundingInfo');
             const fundingRounds = data.funding?.round_details;
-
             if (fundingRounds && fundingRounds.length > 0) {
                 let fundingHtml = '<ul class="data-list">';
                 fundingRounds.forEach(round => {
@@ -332,13 +257,7 @@
                     const amount = round.raised ? `$${round.raised.toLocaleString()}` : 'Amount N/A';
                     const investors = round.investors?.join(', ') || 'Investors N/A';
                     const roundType = round.type ? ` (${round.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())})` : '';
-
-                    fundingHtml += `
-                        <li>
-                            <strong>${date}${roundType}: ${amount}</strong><br>
-                            <small>Investors: ${investors}</small>
-                        </li>
-                    `;
+                    fundingHtml += `<li><strong>${date}${roundType}: ${amount}</strong><br><small>Investors: ${investors}</small></li>`;
                 });
                 fundingHtml += '</ul>';
                 fundingInfoEl.innerHTML = fundingHtml;
@@ -348,6 +267,107 @@
 
             resultsDiv.style.display = 'block';
             fetchAndDisplayPeople(data.id);
+        }
+
+        // --- MAJORLY UPDATED FUNCTION ---
+        async function fetchAndDisplayPeople(companyId) {
+            const peopleInfoEl = document.getElementById('peopleInfo');
+            peopleInfoEl.innerHTML = '<p>Loading founders from Specter...</p>';
+
+            try {
+                // Step 1: Fetch basic founder info from Specter
+                const peopleResponse = await fetch(`/api/people?companyId=${companyId}`);
+                const peopleData = await peopleResponse.json();
+
+                if (!peopleResponse.ok) throw new Error(peopleData.error || 'Failed to fetch founders.');
+                if (!peopleData || peopleData.length === 0) {
+                    peopleInfoEl.innerHTML = '<p>No founders found for this company.</p>';
+                    return;
+                }
+
+                // Step 2: Prepare to render basic info while waiting for LinkedIn data
+                let initialHtml = '<ul class="data-list">';
+                peopleData.forEach(person => {
+                    initialHtml += `
+                        <li id="person-${person.id}">
+                            <strong>${person.full_name || 'N/A'}</strong><br>
+                            <small>Title: ${person.current_position_title || 'N/A'}</small><br>
+                            ${person.linkedin_url ? `<a href="${person.linkedin_url}" target="_blank">LinkedIn Profile</a>` : '<span>No LinkedIn Profile</span>'}
+                            <div class="linkedin-details-container"></div>
+                        </li>`;
+                });
+                initialHtml += '</ul>';
+                peopleInfoEl.innerHTML = initialHtml;
+
+                // Step 3: Fetch detailed LinkedIn profiles from our new endpoint
+                const linkedinUrls = peopleData.map(p => p.linkedin_url).filter(Boolean);
+                if (linkedinUrls.length === 0) {
+                    return; // No LinkedIn URLs to fetch
+                }
+
+                // Update status for the user
+                peopleData.forEach(person => {
+                    if (person.linkedin_url) {
+                        const container = document.querySelector(`#person-${person.id} .linkedin-details-container`);
+                        container.innerHTML = `<p style="color:#31708f; font-size:0.9em; margin-top:10px;"><i>Fetching LinkedIn details...</i></p>`;
+                    }
+                });
+
+                const linkedinResponse = await fetch('/api/linkedin-profiles', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ urls: linkedinUrls }),
+                });
+                const detailedProfiles = await linkedinResponse.json();
+
+                if (!linkedinResponse.ok) throw new Error(detailedProfiles.error || 'Failed to fetch LinkedIn profiles.');
+
+                // Step 4: Create a map for easy lookup and render the detailed info
+                const profileMap = new Map(detailedProfiles.map(p => [p.input_url, p]));
+
+                peopleData.forEach(person => {
+                    const details = profileMap.get(person.linkedin_url);
+                    const container = document.querySelector(`#person-${person.id} .linkedin-details-container`);
+
+                    if (details) {
+                        let detailsHtml = '<div class="linkedin-details">';
+
+                        // Work Experience
+                        if (details.experience && details.experience.length > 0) {
+                            detailsHtml += '<h4>Work Experience</h4>';
+                            details.experience.forEach(exp => {
+                                detailsHtml += `
+                                    <div class="detail-block">
+                                        <p><strong>${exp.job_title}</strong> at ${exp.company}</p>
+                                        <p><small>${exp.duration}</small></p>
+                                        <p class="description">${exp.description}</p>
+                                    </div>`;
+                            });
+                        }
+
+                        // Education
+                        if (details.education && details.education.length > 0) {
+                            detailsHtml += '<h4>Education</h4>';
+                            details.education.forEach(edu => {
+                                detailsHtml += `
+                                    <div class="detail-block">
+                                        <p><strong>${edu.degree}</strong>, ${edu.field}</p>
+                                        <p><small>${edu.school}</small></p>
+                                    </div>`;
+                            });
+                        }
+
+                        detailsHtml += '</div>';
+                        container.innerHTML = detailsHtml;
+                    } else if (person.linkedin_url) {
+                        container.innerHTML = `<p style="color:#d9534f; font-size:0.9em; margin-top:10px;"><i>Could not retrieve LinkedIn details.</i></p>`;
+                    }
+                });
+
+            } catch (error) {
+                console.error('Error fetching/displaying people:', error);
+                peopleInfoEl.innerHTML = `<p style="color: #d9534f;">Could not load founders: ${error.message}</p>`;
+            }
         }
     </script>
 
